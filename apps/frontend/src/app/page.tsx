@@ -1,65 +1,115 @@
-import Image from "next/image";
+"use client";
+
+import React, { useState, useEffect } from "react";
+import Navbar from "../components/Navbar";
+import HeroCopy from "../components/HeroCopy";
+import SviVisualizer from "../components/SviVisualizer";
+import Metrics from "../components/Metrics";
+import Methodology from "../components/Methodology";
+import SecurityConsole from "../components/SecurityConsole";
+import Integrations from "../components/Integrations";
+import Footer from "../components/Footer";
 
 export default function Home() {
+  // Global simulated metrics state
+  const [tvl, setTvl] = useState(12482904.50);
+  const [totalHarvested, setTotalHarvested] = useState(341920.80);
+  const [currentSuiPrice, setCurrentSuiPrice] = useState(1.8425);
+  const [systemCycle, setSystemCycle] = useState(1);
+  const [marketRegime, setMarketRegime] = useState<"low" | "high" | "outlier">("low");
+  
+  // Guardrail Simulation State
+  const [simulationActive, setSimulationActive] = useState(false);
+  const [simulationError, setSimulationError] = useState(false);
+
+  // Smooth wave animation factor
+  const [waveOffset, setWaveOffset] = useState(0);
+
+  useEffect(() => {
+    // Increment TVL and Harvested values slowly to show "live harvesting"
+    const metricsInterval = setInterval(() => {
+      setTvl((prev) => prev + (Math.random() * 2.5));
+      setTotalHarvested((prev) => prev + (Math.random() * 0.4));
+      setCurrentSuiPrice((prev) => {
+        const delta = (Math.random() - 0.5) * 0.002;
+        return parseFloat((prev + delta).toFixed(4));
+      });
+    }, 3000);
+
+    // Continuous wave animation loop
+    let step = 0;
+    const waveInterval = setInterval(() => {
+      step += 0.04;
+      setWaveOffset(Math.sin(step));
+    }, 80);
+
+    // Cycle tick every 15 seconds
+    const cycleInterval = setInterval(() => {
+      setSystemCycle((prev) => (prev % 10) + 1);
+    }, 15000);
+
+    return () => {
+      clearInterval(metricsInterval);
+      clearInterval(waveInterval);
+      clearInterval(cycleInterval);
+    };
+  }, []);
+
+  // Handler to coordinate selected market regime and safety console simulation
+  const handleRegimeChange = (regime: "low" | "high" | "outlier") => {
+    setMarketRegime(regime);
+    if (regime === "outlier") {
+      setSimulationActive(true);
+      setSimulationError(false);
+      const timer = setTimeout(() => {
+        setSimulationError(true);
+      }, 1500);
+      return () => clearTimeout(timer);
+    } else {
+      setSimulationActive(false);
+      setSimulationError(false);
+    }
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen bg-[#08090a] text-[#f3f4f6] font-sans selection:bg-[#2e7cf6]/30 selection:text-[#f3f4f6]">
+      {/* BACKGROUND GRID MATRIX */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#111317_1px,transparent_1px),linear-gradient(to_bottom,#111317_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-30 pointer-events-none" />
+
+      {/* MODULAR COMPONENTS */}
+      <Navbar />
+
+      {/* HERO SECTION CONTAINER */}
+      <section className="mx-auto max-w-7xl px-6 pt-16 pb-20 md:pt-24 md:pb-28 grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+        <div className="lg:col-span-7">
+          <HeroCopy />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <div className="lg:col-span-5 w-full flex justify-center">
+          <SviVisualizer 
+            marketRegime={marketRegime}
+            onRegimeChange={handleRegimeChange}
+            waveOffset={waveOffset}
+            currentSuiPrice={currentSuiPrice}
+            systemCycle={systemCycle}
+          />
         </div>
-      </main>
+      </section>
+
+      <Metrics tvl={tvl} totalHarvested={totalHarvested} />
+
+      <Methodology />
+
+      <SecurityConsole 
+        marketRegime={marketRegime}
+        onRegimeChange={handleRegimeChange}
+        simulationActive={simulationActive}
+        simulationError={simulationError}
+        tvl={tvl}
+      />
+
+      <Integrations />
+
+      <Footer />
     </div>
   );
 }

@@ -1,3 +1,10 @@
+# Agent Module
+/.agents/
+/.impeccable/
+DESIGN.md
+PRODUCT.md
+product-design.md
+
 # Dependency directories
 node_modules/
 jspm_packages/

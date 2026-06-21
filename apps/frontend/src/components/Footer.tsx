@@ -9,15 +9,15 @@ const FOOTER_COLUMNS = [
     title: "Protocol",
     links: [
       { label: "Strategy" },
-      { label: "Integrations" },
       { label: "Guardrails" },
+      { label: "Get Started" },
     ],
   },
   {
     title: "Developers",
     links: [
-      { label: "Documentation" },
-      { label: "Sui Move Vault" },
+      { label: "DeepBook Predict" },
+      { label: "Integration Docs" },
       { label: "GitHub", href: "https://github.com/w1th0ut/axis-predict" },
     ],
   },
@@ -63,9 +63,8 @@ export default function Footer() {
               className="h-9 w-auto object-contain"
             />
             <p className="mt-6 text-[1.02rem] leading-8 text-[var(--axis-text-secondary)]">
-              AI-powered premium harvesting for DeepBook Predict on Sui.
-              Deposit dUSDC, receive liquid vault shares, and keep risk
-              enforcement on-chain.
+              Vol-surface vault automation built on DeepBook Predict. Deposit
+              dUSDC, receive liquid shares, and keep risk enforcement on-chain.
             </p>
 
             <div className="mt-10 flex flex-wrap gap-8 text-sm text-[var(--axis-text-secondary)]">
@@ -120,7 +119,7 @@ export default function Footer() {
             &copy; 2026{" "}
             <span className="text-[var(--axis-text-primary)]">Axis </span>
             <span className="text-[var(--axis-primary)]">Predict</span>.
-            {" "}Open source infrastructure for explainable vault automation.
+            {" "}Open infrastructure for vol-surface vault automation.
           </div>
         </div>
       </div>

@@ -14,14 +14,12 @@ const CURRENCY_FORMATTER = new Intl.NumberFormat("en-US", {
 });
 
 export default function HeroStats({ totalHarvested, tvl }: HeroStatsProps) {
-  const [displayTvl, setDisplayTvl] = useState<string>("");
-  const [displayHarvested, setDisplayHarvested] = useState<string>("");
-
-  // Initialize with formatted values to avoid hydration mismatch
-  useEffect(() => {
-    setDisplayTvl(CURRENCY_FORMATTER.format(tvl));
-    setDisplayHarvested(CURRENCY_FORMATTER.format(totalHarvested));
-  }, [tvl, totalHarvested]);
+  const [displayTvl, setDisplayTvl] = useState<string>(() =>
+    CURRENCY_FORMATTER.format(tvl),
+  );
+  const [displayHarvested, setDisplayHarvested] = useState<string>(() =>
+    CURRENCY_FORMATTER.format(totalHarvested),
+  );
 
   // Run the randomizer decrypt animation on mount
   useEffect(() => {
@@ -81,12 +79,12 @@ export default function HeroStats({ totalHarvested, tvl }: HeroStatsProps) {
   const items = [
     {
       label: "Vault TVL",
-      value: displayTvl || CURRENCY_FORMATTER.format(tvl),
+      value: displayTvl,
       note: "Active liquidity",
     },
     {
       label: "Premium",
-      value: displayHarvested || CURRENCY_FORMATTER.format(totalHarvested),
+      value: displayHarvested,
       note: "Harvested yield",
     },
     {

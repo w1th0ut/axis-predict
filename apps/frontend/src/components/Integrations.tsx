@@ -32,21 +32,9 @@ const INTEGRATIONS: IntegrationItem[] = [
   },
   {
     id: "mystenlabs",
-    name: "MystenLabs",
+    name: "Mysten Labs",
     logoSrc: "/mystenlabs.png",
     logoWidthClass: "w-44",
-  },
-  {
-    id: "react",
-    name: "React",
-    logoSrc: "/react.png",
-    logoWidthClass: "w-16",
-  },
-  {
-    id: "tailwind",
-    name: "Tailwind CSS",
-    logoSrc: "/tailwind.png",
-    logoWidthClass: "w-18 sm:w-20",
   },
 ];
 
@@ -85,7 +73,7 @@ export default function Integrations() {
           </span>
         </ScrollReveal>
 
-        <div className="mt-12 grid overflow-hidden border border-[rgba(255,255,255,0.06)] md:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-12 grid overflow-hidden border border-[rgba(255,255,255,0.06)] md:grid-cols-2">
           {INTEGRATIONS.map((item, index) => (
             <ScrollReveal
               key={item.id}

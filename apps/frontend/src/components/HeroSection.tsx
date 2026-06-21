@@ -23,7 +23,7 @@ export default function HeroSection({
         <div className="flex min-h-[calc(100svh-8.5rem)] flex-col justify-center">
           <div className="max-w-[32rem]">
             <span className="axis-intro axis-intro--eyebrow font-mono text-[0.72rem] uppercase tracking-[0.18em] text-[var(--axis-text-muted)]">
-              AI volatility harvesting on Sui
+              Built on DeepBook Predict
             </span>
             <h1 className="axis-intro axis-intro--headline font-display mt-5 text-[3.6rem] leading-[0.9] tracking-[-0.06em] text-[var(--axis-text-primary)] sm:text-[4.8rem] lg:text-[5.9rem]">
               <span className="block whitespace-nowrap">Range premium,</span>
@@ -32,8 +32,8 @@ export default function HeroSection({
               </span>
             </h1>
             <p className="axis-intro axis-intro--copy mt-8 max-w-[28rem] text-[1.05rem] leading-8 text-[var(--axis-text-muted)] text-pretty">
-              SVI-driven execution, liquid vault shares, and a hard 20%
-              on-chain allocation cap.
+              Automated range deployment, liquid vault shares, and hard
+              on-chain exposure limits.
             </p>
             <div aria-hidden="true" className="mt-8 h-12" />
           </div>

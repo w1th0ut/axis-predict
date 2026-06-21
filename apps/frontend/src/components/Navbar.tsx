@@ -10,6 +10,7 @@ export default function Navbar() {
   const navItems = [
     { href: "#strategy", label: "Strategy" },
     { href: "#integrations", label: "Integrations" },
+    { href: "#get-started", label: "Get Started" },
   ];
 
   useEffect(() => {

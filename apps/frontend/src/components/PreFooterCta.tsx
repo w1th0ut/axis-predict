@@ -6,7 +6,10 @@ import ScrollReveal from "./ScrollReveal";
 
 export default function PreFooterCta() {
   return (
-    <section className="bg-[var(--axis-background)] px-5 py-16 sm:px-6 lg:px-10 lg:py-20">
+    <section
+      id="get-started"
+      className="bg-[var(--axis-background)] px-5 py-16 sm:px-6 lg:px-10 lg:py-20"
+    >
       <div className="mx-auto max-w-[90rem]">
         <ScrollReveal variant="glow">
           <div className="relative overflow-hidden border border-[rgba(255,255,255,0.78)] bg-[rgba(8,9,10,0.9)]">
@@ -22,7 +25,8 @@ export default function PreFooterCta() {
                 </h2>
                 <p className="mt-8 max-w-[34rem] text-[1.08rem] leading-9 text-[var(--axis-text-secondary)]">
                   Deposit dUSDC, receive liquid shares, and let Axis Predict
-                  harvest rolling premium with hard on-chain guardrails.
+                  allocate across DeepBook Predict ranges with on-chain
+                  guardrails.
                 </p>
 
                 <div className="mt-10 flex flex-wrap gap-5">
@@ -35,7 +39,7 @@ export default function PreFooterCta() {
                     
                     {/* Button content */}
                     <span className="relative z-10 flex items-center">
-                      Launch app
+                      Launch App
                       <span className="ml-3 text-[1.2rem] transition-transform duration-200 group-hover:translate-x-1">&rarr;</span>
                     </span>
                   </a>

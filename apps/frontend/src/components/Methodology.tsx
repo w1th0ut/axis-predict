@@ -9,22 +9,22 @@ import ScrollReveal from "./ScrollReveal";
 const FEATURE_CARDS = [
   {
     index: "02",
-    title: "Live AI Reasoning",
-    body: "Every execution path is surfaced as readable reasoning, not hidden behind a black box.",
+    title: "Readable Strategy Logic",
+    body: "Each allocation path stays legible before execution, not buried inside opaque automation.",
     metric: "24/7",
     footnote: "agent cadence",
   },
   {
     index: "03",
-    title: "Tokenized Vault Shares",
-    body: "Deposits become liquid vault shares so capital stays legible and composable.",
+    title: "Liquid Vault Shares",
+    body: "Deposits become transferable vault shares so capital stays visible and composable on Sui.",
     metric: "pUSDC",
     footnote: "share token",
   },
   {
     index: "04",
-    title: "DeepBook Predict Sync",
-    body: "Strategy tracks rolling market conditions so the vault reacts with discipline, not impulse.",
+    title: "SVI Oracle Sync",
+    body: "The vault prices and rebalances against DeepBook Predict instead of static strikes.",
     metric: "SVI",
     footnote: "pricing surface",
   },

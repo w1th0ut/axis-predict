@@ -18,6 +18,9 @@ export interface AppConfig {
   agentPrivateKey: string | undefined;
   deployerPrivateKey: string | undefined;
   openRouterApiKey: string | undefined;
+  openRouterModel: string | undefined;
+  autoStrategyEnabled: boolean;
+  autoStrategyIntervalMs: number;
 }
 
 const DEFAULT_PREDICT_PACKAGE_ID =
@@ -69,6 +72,9 @@ export function loadConfig(): AppConfig {
     agentPrivateKey: readEnv('AGENT_PRIVATE_KEY'),
     deployerPrivateKey: readEnv('DEPLOYER_PRIVATE_KEY'),
     openRouterApiKey: readEnv('OPENROUTER_API_KEY'),
+    openRouterModel: readEnv('OPENROUTER_MODEL') ?? 'openai/gpt-4o-mini',
+    autoStrategyEnabled: readEnv('AUTO_STRATEGY_ENABLED') !== 'false',
+    autoStrategyIntervalMs: Number(readEnv('AUTO_STRATEGY_INTERVAL_MS') ?? '60000'),
   };
 }
 

@@ -207,10 +207,32 @@ export class AxisAgentService {
     }
 
     const preview = await this.previewRangeTrade(input);
-    const exactCost = BigInt(preview.mintCost);
 
     const tx = new Transaction();
     tx.setGasBudget(80_000_000);
+
+    const rangeKey = tx.moveCall({
+      target: `${this.config.predictPackageId}::range_key::new`,
+      arguments: [
+        tx.pure.id(input.oracleId),
+        tx.pure.u64(expiry),
+        tx.pure.u64(lowerStrike),
+        tx.pure.u64(higherStrike),
+      ],
+    });
+
+    const tradeAmounts = tx.moveCall({
+      target: `${this.config.predictPackageId}::predict::get_range_trade_amounts`,
+      arguments: [
+        tx.object(this.config.predictObjectId),
+        tx.object(input.oracleId),
+        rangeKey,
+        tx.pure.u64(quantity),
+        tx.object(this.config.clockObjectId),
+      ],
+    }) as any;
+
+    const dynamicCost = tradeAmounts[0];
 
     const allocation = tx.moveCall({
       target: `${this.config.axisPackageId}::axis_vault::allocate_range_position`,
@@ -218,7 +240,7 @@ export class AxisAgentService {
       arguments: [
         tx.object(this.config.axisAgentCapId),
         tx.object(this.config.axisVaultId),
-        tx.pure.u64(exactCost),
+        dynamicCost,
         tx.pure.u64(quantity),
         tx.pure.id(this.config.predictObjectId),
         tx.pure.id(this.config.predictManagerId),
@@ -237,7 +259,7 @@ export class AxisAgentService {
       arguments: [tx.object(this.config.predictManagerId), capital],
     });
 
-    const rangeKey = tx.moveCall({
+    const rangeKeyForMint = tx.moveCall({
       target: `${this.config.predictPackageId}::range_key::new`,
       arguments: [
         tx.pure.id(input.oracleId),
@@ -254,7 +276,7 @@ export class AxisAgentService {
         tx.object(this.config.predictObjectId),
         tx.object(this.config.predictManagerId),
         tx.object(input.oracleId),
-        rangeKey,
+        rangeKeyForMint,
         tx.pure.u64(quantity),
         tx.object(this.config.clockObjectId),
       ],
@@ -275,10 +297,18 @@ export class AxisAgentService {
       } as never),
     );
 
+    let finalAllocationAmount = preview.mintCost;
+    const allocatedEvent = result.events?.find(
+      (ev: any) => ev.type.includes('::axis_vault::StrategyAllocated'),
+    );
+    if (allocatedEvent && allocatedEvent.parsedJson) {
+      finalAllocationAmount = allocatedEvent.parsedJson.allocated_amount;
+    }
+
     return stringifyBigints({
       digest: result.digest,
       ticketId: findObjectChangeId(result, '::axis_vault::StrategyTicket'),
-      allocationAmount: exactCost,
+      allocationAmount: finalAllocationAmount,
       preview,
     });
   }
@@ -417,6 +447,29 @@ export class AxisAgentService {
 
     const [balanceBytes] = extractReturnBytes(inspect);
     return decodeU64(balanceBytes);
+  }
+
+  async getStrategyTicketPublic(ticketId: string): Promise<StrategyTicketSnapshot> {
+    return this.getStrategyTicket(ticketId);
+  }
+
+  async getActiveTicketId(): Promise<string | null> {
+    assertAxisRuntimeConfig(this.config);
+    const address = this.getAgentAddress();
+    if (!address) return null;
+
+    const ticketType = `${this.config.axisPackageId}::axis_vault::StrategyTicket`;
+    const response = (await this.client.getOwnedObjects({
+      owner: address,
+      filter: {
+        StructType: ticketType,
+      },
+    } as any)) as any;
+
+    if (response?.data && response.data.length > 0) {
+      return response.data[0].data?.objectId ?? null;
+    }
+    return null;
   }
 
   private async getStrategyTicket(ticketId: string): Promise<StrategyTicketSnapshot> {

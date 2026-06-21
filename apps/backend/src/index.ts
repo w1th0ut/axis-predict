@@ -5,6 +5,7 @@ import { AxisAgentService } from './axis-agent-service.js';
 import { loadConfig } from './config.js';
 import { PredictApiClient } from './predict-api.js';
 import { createSuiClient } from './sui.js';
+import { StrategyScheduler } from './scheduler.js';
 
 dotenv.config();
 
@@ -13,8 +14,22 @@ const client = createSuiClient(config);
 const predictApi = new PredictApiClient(config.predictServerUrl);
 const axisAgent = new AxisAgentService(config, client, predictApi);
 
+const scheduler = new StrategyScheduler(config, axisAgent, predictApi);
+scheduler.start();
+
 const app = express();
 app.use(express.json());
+
+// Enable CORS for frontend client
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  if (req.method === 'OPTIONS') {
+    res.header('Access-Control-Allow-Methods', 'PUT, POST, PATCH, DELETE, GET');
+    return res.status(200).json({});
+  }
+  next();
+});
 
 function handleRoute(
   handler: (req: express.Request, res: express.Response) => Promise<void>,
@@ -81,7 +96,32 @@ app.get(
 app.get(
   '/agent/status',
   handleRoute(async (_req, res) => {
-    res.json(await axisAgent.getManagerStatus());
+    const status = await axisAgent.getManagerStatus();
+    
+    let activeStrategy = null;
+    try {
+      const ticketId = await axisAgent.getActiveTicketId();
+      if (ticketId) {
+        const ticket = await axisAgent.getStrategyTicketPublic(ticketId);
+        activeStrategy = {
+          ticketId: ticket.id,
+          oracleId: ticket.oracleId,
+          lowerStrike: ticket.lowerStrike.toString(),
+          higherStrike: ticket.higherStrike.toString(),
+          expiry: ticket.expiry.toString(),
+          quantity: ticket.quantity.toString(),
+          allocatedAmount: ticket.allocatedAmount.toString(),
+        };
+      }
+    } catch (err) {
+      console.error('Error fetching active strategy for status endpoint:', err);
+    }
+
+    res.json({
+      ...status,
+      activeStrategy,
+      logs: scheduler.getLogs(),
+    });
   }),
 );
 

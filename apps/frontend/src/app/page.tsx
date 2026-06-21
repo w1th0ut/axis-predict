@@ -7,24 +7,61 @@ import Methodology from "../components/Methodology";
 import Integrations from "../components/Integrations";
 import PreFooterCta from "../components/PreFooterCta";
 import Footer from "../components/Footer";
+import {
+  fetchBackendJson,
+  isAbortError,
+} from "../features/dashboard/backend";
+
+interface VaultSummaryResponse {
+  totalAccountedValue: string;
+  cumulativeProfit: string;
+}
 
 export default function Home() {
-  const [tvl, setTvl] = useState(12482904.50);
-  const [totalHarvested, setTotalHarvested] = useState(341920.80);
+  const [tvl, setTvl] = useState(0);
+  const [totalHarvested, setTotalHarvested] = useState(0);
   const [waveOffset, setWaveOffset] = useState(0);
 
   useEffect(() => {
-    const metricsInterval = setInterval(() => {
-      setTvl((prev) => prev + (Math.random() * 2.5));
-      setTotalHarvested((prev) => prev + (Math.random() * 0.4));
-    }, 3000);
+    let disposed = false;
+
+    const fetchVaultMetrics = async () => {
+      const controller = new AbortController();
+      try {
+        const summary = await fetchBackendJson<VaultSummaryResponse>("/vault/summary", {
+          signal: controller.signal,
+        });
+
+        if (!disposed) {
+          setTvl(Number(summary.totalAccountedValue) / 1_000_000);
+          setTotalHarvested(Number(summary.cumulativeProfit) / 1_000_000);
+        }
+      } catch (error) {
+        if (!disposed && !isAbortError(error)) {
+          console.error("Failed to fetch landing metrics:", error);
+        }
+      }
+
+      return () => controller.abort();
+    };
+
+    let cancelLastFetch: (() => void) | void;
+    const runFetch = async () => {
+      cancelLastFetch = await fetchVaultMetrics();
+    };
+
+    runFetch();
+    const metricsInterval = setInterval(runFetch, 8000);
 
     let step = 0;
     const waveInterval = setInterval(() => {
       step += 0.04;
       setWaveOffset(Math.sin(step));
     }, 80);
+
     return () => {
+      disposed = true;
+      cancelLastFetch?.();
       clearInterval(metricsInterval);
       clearInterval(waveInterval);
     };

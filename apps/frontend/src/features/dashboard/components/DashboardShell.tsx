@@ -13,6 +13,7 @@ import { dashboardMock } from "../mock";
 import { DashboardView, PortfolioHeroData } from "../types";
 import ActivityLogPanel from "./ActivityLogPanel";
 import ActivityPulsePanel from "./ActivityPulsePanel";
+import DashboardConnectGate from "./DashboardConnectGate";
 import AgentReasoningPanel from "./AgentReasoningPanel";
 import DashboardSideNav from "./DashboardSideNav";
 import {
@@ -457,7 +458,11 @@ export default function DashboardShell() {
               onOpenNav={() => setMobileOpen(true)}
             />
 
-            {activeView === "overview" ? (
+            {!account ? (
+              <DashboardConnectGate />
+            ) : null}
+
+            {account && activeView === "overview" ? (
               showOverviewSkeleton ? (
                 <OverviewSkeleton />
               ) : (
@@ -473,7 +478,7 @@ export default function DashboardShell() {
               )
             ) : null}
 
-            {activeView === "vault" ? (
+            {account && activeView === "vault" ? (
               showVaultSkeleton ? (
                 <VaultSkeleton />
               ) : (
@@ -493,7 +498,7 @@ export default function DashboardShell() {
               )
             ) : null}
 
-            {activeView === "activity" ? (
+            {account && activeView === "activity" ? (
               showActivitySkeleton ? (
                 <ActivitySkeleton />
               ) : (

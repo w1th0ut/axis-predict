@@ -69,6 +69,21 @@ export function unwrapTransactionResult(result: any) {
   return result?.Transaction ?? result?.FailedTransaction ?? result;
 }
 
+export function assertTransactionSuccess(result: any, label: string) {
+  const tx = unwrapTransactionResult(result);
+  const status = tx?.effects?.status;
+  const normalizedStatus =
+    typeof status === 'string' ? status : typeof status?.status === 'string' ? status.status : undefined;
+
+  if (normalizedStatus && normalizedStatus !== 'success') {
+    const reason =
+      (typeof status?.error === 'string' && status.error) ||
+      (typeof tx?.errors?.[0] === 'string' && tx.errors[0]) ||
+      'Unknown transaction failure';
+    throw new Error(`${label} failed on-chain. ${reason}`);
+  }
+}
+
 export function findObjectChangeId(result: any, typeNeedle: string, changeKind: string = 'created') {
   const tx = unwrapTransactionResult(result);
   const changes = tx?.objectChanges;
@@ -113,10 +128,52 @@ export function decodeU64(bytes: Uint8Array): bigint {
   return value;
 }
 
+function compactInspectError(value: unknown): string | null {
+  if (!value) return null;
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    const parts = value
+      .map((item) => compactInspectError(item))
+      .filter((item): item is string => Boolean(item));
+    return parts.length > 0 ? parts.join(' | ') : null;
+  }
+
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const candidates = [
+      record.error,
+      record.message,
+      record.status,
+      record.executionErrorSource,
+      record.effects,
+      record.localExecutionStatus,
+    ];
+    for (const candidate of candidates) {
+      const text = compactInspectError(candidate);
+      if (text) return text;
+    }
+  }
+
+  return null;
+}
+
 export function extractReturnBytes(devInspectResult: any) {
   const commands = devInspectResult?.results ?? devInspectResult?.commandResults;
   if (!Array.isArray(commands) || commands.length === 0) {
-    throw new Error('Dev inspect did not return any command results.');
+    const failureReason =
+      compactInspectError(devInspectResult?.error) ??
+      compactInspectError(devInspectResult?.effects?.status) ??
+      compactInspectError(devInspectResult?.effects) ??
+      compactInspectError(devInspectResult);
+    throw new Error(
+      failureReason
+        ? `Dev inspect did not return any command results. ${failureReason}`
+        : 'Dev inspect did not return any command results.',
+    );
   }
 
   const last = commands[commands.length - 1];

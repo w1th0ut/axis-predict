@@ -97,29 +97,9 @@ app.get(
   '/agent/status',
   handleRoute(async (_req, res) => {
     const status = await axisAgent.getManagerStatus();
-    
-    let activeStrategy = null;
-    try {
-      const ticketId = await axisAgent.getActiveTicketId();
-      if (ticketId) {
-        const ticket = await axisAgent.getStrategyTicketPublic(ticketId);
-        activeStrategy = {
-          ticketId: ticket.id,
-          oracleId: ticket.oracleId,
-          lowerStrike: ticket.lowerStrike.toString(),
-          higherStrike: ticket.higherStrike.toString(),
-          expiry: ticket.expiry.toString(),
-          quantity: ticket.quantity.toString(),
-          allocatedAmount: ticket.allocatedAmount.toString(),
-        };
-      }
-    } catch (err) {
-      console.error('Error fetching active strategy for status endpoint:', err);
-    }
 
     res.json({
       ...status,
-      activeStrategy,
       logs: scheduler.getLogs(),
     });
   }),
@@ -145,7 +125,12 @@ app.get(
     if (!config.predictManagerId) {
       throw new Error('DEEPBOOK_MANAGER_ID is not configured.');
     }
-    res.json(await predictApi.getManagerSummary(config.predictManagerId));
+    const status = await axisAgent.getManagerStatus();
+    res.json({
+      summary: status.summary,
+      indexerStatus: status.indexerStatus,
+      activeStrategy: status.activeStrategy,
+    });
   }),
 );
 
@@ -155,7 +140,12 @@ app.get(
     if (!config.predictManagerId) {
       throw new Error('DEEPBOOK_MANAGER_ID is not configured.');
     }
-    res.json(await predictApi.getManagerPositionsSummary(config.predictManagerId));
+    const status = await axisAgent.getManagerStatus();
+    res.json({
+      positions: status.positions,
+      indexerStatus: status.indexerStatus,
+      activeStrategy: status.activeStrategy,
+    });
   }),
 );
 

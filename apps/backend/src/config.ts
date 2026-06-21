@@ -21,6 +21,7 @@ export interface AppConfig {
   openRouterModel: string | undefined;
   autoStrategyEnabled: boolean;
   autoStrategyIntervalMs: number;
+  strategyMaxTradeDusdc: number;
 }
 
 const DEFAULT_PREDICT_PACKAGE_ID =
@@ -52,6 +53,15 @@ function parsePort(value: string | undefined): number {
   return port;
 }
 
+function parsePositiveNumber(value: string | undefined, fallback: number): number {
+  if (!value) return fallback;
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`Invalid positive numeric value: ${value}`);
+  }
+  return parsed;
+}
+
 export function loadConfig(): AppConfig {
   const network = parseNetwork(readEnv('SUI_NETWORK'));
   const rpcUrl = readEnv('SUI_RPC_URL') ?? getJsonRpcFullnodeUrl(network);
@@ -75,6 +85,7 @@ export function loadConfig(): AppConfig {
     openRouterModel: readEnv('OPENROUTER_MODEL') ?? 'openai/gpt-4o-mini',
     autoStrategyEnabled: readEnv('AUTO_STRATEGY_ENABLED') !== 'false',
     autoStrategyIntervalMs: Number(readEnv('AUTO_STRATEGY_INTERVAL_MS') ?? '60000'),
+    strategyMaxTradeDusdc: parsePositiveNumber(readEnv('STRATEGY_MAX_TRADE_DUSDC'), 10),
   };
 }
 

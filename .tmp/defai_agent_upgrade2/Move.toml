@@ -1,0 +1,8 @@
+[package]
+name = "defai_agent"
+edition = "2024.beta"
+
+[dependencies]
+
+[addresses]
+defai_agent = "0x0"

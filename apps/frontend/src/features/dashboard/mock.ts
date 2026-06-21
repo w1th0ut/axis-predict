@@ -14,8 +14,8 @@ export const dashboardMock: DashboardData = {
     totalValueUsd: "$4,820.44",
     depositedDusdc: "1,200.00 dUSDC",
     pusdcBalance: "1,173.82 pUSDC",
-    netPnl: { value: "+8.4%", positive: true },
-    shareGrowth: { value: "+2.7%", positive: true },
+    netPnl: { value: "+8.4%", tone: "positive" },
+    shareGrowth: { value: "+2.7%", tone: "positive" },
     vaultMode: "active_roll",
     summary:
       "Axis Predict is actively allocating across DeepBook Predict ranges.",

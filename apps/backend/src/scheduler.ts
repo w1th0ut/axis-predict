@@ -9,6 +9,19 @@ interface AIDecision {
   reason: string;
 }
 
+interface OracleCandidate {
+  oracleId: string;
+  underlyingAsset: string;
+  expiry: bigint;
+  spotPriceUSD: number;
+}
+
+interface PreviewCandidate {
+  lowerStrikeUSD: number;
+  higherStrikeUSD: number;
+  reason: string;
+}
+
 export class StrategyScheduler {
   private isProcessing = false;
   private intervalId: NodeJS.Timeout | null = null;
@@ -43,6 +56,96 @@ export class StrategyScheduler {
     if (this.logs.length > 12) {
       this.logs.shift();
     }
+  }
+
+  private normalizeStrikePair(lowerStrikeUSD: number, higherStrikeUSD: number) {
+    const strikeInterval = 1000;
+    let lower = Math.round(lowerStrikeUSD / strikeInterval) * strikeInterval;
+    let higher = Math.round(higherStrikeUSD / strikeInterval) * strikeInterval;
+
+    if (lower === higher) {
+      higher = lower + strikeInterval;
+    }
+    if (lower > higher) {
+      [lower, higher] = [higher, lower];
+    }
+
+    return { lowerStrikeUSD: lower, higherStrikeUSD: higher };
+  }
+
+  private buildPreviewCandidates(decision: AIDecision, spotPriceUSD: number): PreviewCandidate[] {
+    const centerFloor = Math.floor(spotPriceUSD / 1000) * 1000;
+    const baseCandidates = [
+      {
+        ...this.normalizeStrikePair(decision.lowerStrikeUSD, decision.higherStrikeUSD),
+        reason: 'AI-selected range',
+      },
+      {
+        lowerStrikeUSD: centerFloor,
+        higherStrikeUSD: centerFloor + 1000,
+        reason: 'Spot-centered fallback',
+      },
+      {
+        lowerStrikeUSD: centerFloor - 1000,
+        higherStrikeUSD: centerFloor,
+        reason: 'Spot-lower fallback',
+      },
+      {
+        lowerStrikeUSD: centerFloor + 1000,
+        higherStrikeUSD: centerFloor + 2000,
+        reason: 'Spot-upper fallback',
+      },
+      {
+        lowerStrikeUSD: centerFloor - 1000,
+        higherStrikeUSD: centerFloor + 1000,
+        reason: 'Wider centered fallback',
+      },
+    ];
+
+    const deduped = new Map<string, PreviewCandidate>();
+    for (const candidate of baseCandidates) {
+      if (candidate.lowerStrikeUSD < 0 || candidate.higherStrikeUSD < 0) continue;
+      const key = `${candidate.lowerStrikeUSD}-${candidate.higherStrikeUSD}`;
+      if (!deduped.has(key)) {
+        deduped.set(key, candidate);
+      }
+    }
+    return [...deduped.values()];
+  }
+
+  private async resolveTradableOracle(): Promise<OracleCandidate | null> {
+    const oracles = await this.predictApi.getOracleIds(this.config.predictObjectId);
+    const now = Date.now();
+    const activeOracles = Array.isArray(oracles)
+      ? oracles
+          .filter((oracle: any) => oracle?.status === 'active' && Number(oracle?.expiry ?? 0) > now + 60_000)
+          .sort((a: any, b: any) => Number(a.expiry) - Number(b.expiry))
+      : [];
+
+    for (const oracle of activeOracles) {
+      try {
+        const state = await this.predictApi.getOracleState(oracle.oracle_id);
+        if (state?.oracle?.status !== 'active') {
+          continue;
+        }
+
+        const spotPriceUSD = Number(state?.latest_price?.spot ?? 0) / 1_000_000_000;
+        if (!Number.isFinite(spotPriceUSD) || spotPriceUSD <= 0) {
+          continue;
+        }
+
+        return {
+          oracleId: oracle.oracle_id,
+          underlyingAsset: oracle.underlying_asset,
+          expiry: BigInt(state.oracle.expiry),
+          spotPriceUSD,
+        };
+      } catch (error) {
+        console.warn(`[Scheduler] Failed to hydrate oracle ${oracle.oracle_id}:`, error);
+      }
+    }
+
+    return null;
   }
 
   public start() {
@@ -84,6 +187,8 @@ export class StrategyScheduler {
       const vaultSummary = await this.axisAgent.getVaultSummary();
       const deployedCapital = BigInt(vaultSummary.deployedCapital);
       const availableLiquidity = BigInt(vaultSummary.availableLiquidity);
+      const totalAccountedValue = BigInt(vaultSummary.totalAccountedValue);
+      const maxAllocationBps = BigInt(vaultSummary.maxAllocationBps);
 
       // Log only on state transitions or action points to keep console clean
       const stateKey = `${deployedCapital.toString()}-${availableLiquidity.toString()}`;
@@ -99,11 +204,21 @@ export class StrategyScheduler {
           if (nowMs >= expiryMs) {
             console.log(`[Scheduler] [ACTION] Active position expired. Settling Ticket: ${ticketId}...`);
             this.addLog('VAULT', `Active position expired. Settling Ticket: ${ticketId.slice(0, 8)}...`, 'info');
-            const result = await this.axisAgent.settleRangeStrategy(ticketId);
-            console.log(`[Scheduler] [SUCCESS] Settle transaction complete. Digest: ${result.digest}`);
-            this.addLog('SUCCESS', `Settle complete! Returned cash to Vault. Digest: ${result.digest.slice(0, 10)}...`, 'success');
-            this.lastLoggedState = ''; // reset state logging
-            this.lastLoggedRemainingMins = -1; // reset
+            try {
+              const result = await this.axisAgent.settleRangeStrategy(ticketId);
+              console.log(`[Scheduler] [SUCCESS] Settle transaction complete. Digest: ${result.digest}`);
+              this.addLog('SUCCESS', `Settle complete! Returned cash to Vault. Digest: ${result.digest.slice(0, 10)}...`, 'success');
+              this.lastLoggedState = ''; // reset state logging
+              this.lastLoggedRemainingMins = -1; // reset
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              if (message.startsWith('SETTLEMENT_NOT_READY:')) {
+                console.log('[Scheduler] Settlement preview not ready yet. Retrying next cycle.');
+                this.addLog('SYSTEM', 'Settlement oracle is not quoteable yet. Retrying next cycle.', 'info');
+                return;
+              }
+              throw error;
+            }
           } else {
             const timeRemainingMins = Math.round((expiryMs - nowMs) / 60000);
             const msg = `Position Active (Ticket: ${ticketId}). Expiry: ${new Date(expiryMs).toLocaleTimeString()}. Remaining: ${timeRemainingMins}m.`;
@@ -141,93 +256,143 @@ export class StrategyScheduler {
           this.lastLoggedState = stateKey;
         }
 
-        const oracles = await this.predictApi.getOracleIds(this.config.predictObjectId);
-        const activeOracles = oracles.filter((o: any) => o.status === 'active');
-
-        if (activeOracles.length === 0) {
+        const targetOracle = await this.resolveTradableOracle();
+        if (!targetOracle) {
           console.warn('[Scheduler] No active oracles found on-chain. Cannot open strategy.');
           this.addLog('SYSTEM', 'No active oracles found on-chain. Cannot open strategy.', 'info');
           return;
         }
-
-        const targetOracle = activeOracles[0];
-        const state = await this.predictApi.getOracleState(targetOracle.oracle_id);
-        const spotPriceUSD = Number(state.latest_price.spot) / 1_000_000_000;
         const expiryDateStr = new Date(Number(targetOracle.expiry)).toLocaleString();
 
         // Call AI
         const decision = await this.askAIForStrategy(
-          targetOracle.underlying_asset,
-          spotPriceUSD,
+          targetOracle.underlyingAsset,
+          targetOracle.spotPriceUSD,
           expiryDateStr,
           Number(availableLiquidity) / 1_000_000
         );
 
         if (decision.shouldOpen) {
           console.log(`[Scheduler] [AI Decision] ${decision.reason}`);
-          
-          // Align strikes to $1000 intervals to prevent transaction failures
-          const strikeInterval = 1000;
-          let lowerStrikeUSD = Math.round(decision.lowerStrikeUSD / strikeInterval) * strikeInterval;
-          let higherStrikeUSD = Math.round(decision.higherStrikeUSD / strikeInterval) * strikeInterval;
-
-          if (lowerStrikeUSD === higherStrikeUSD) {
-            higherStrikeUSD = lowerStrikeUSD + strikeInterval;
-          }
-          if (lowerStrikeUSD > higherStrikeUSD) {
-            const temp = lowerStrikeUSD;
-            lowerStrikeUSD = higherStrikeUSD;
-            higherStrikeUSD = temp;
-          }
-
-          this.addLog('AI', `Decision: Open position. Strikes: $${lowerStrikeUSD} - $${higherStrikeUSD}. Reason: ${decision.reason}`, 'reasoning');
+          this.addLog(
+            'AI',
+            `Decision: Open position. Candidate strikes: $${decision.lowerStrikeUSD} - $${decision.higherStrikeUSD}. Reason: ${decision.reason}`,
+            'reasoning',
+          );
 
           const strikeMultiplier = 1_000_000_000n;
+          const previewCandidates = this.buildPreviewCandidates(decision, targetOracle.spotPriceUSD);
+          let chosenRange: PreviewCandidate | null = null;
+          let chosenQuantity: bigint | null = null;
+          let chosenFinalCost: bigint | null = null;
+          let lastPreviewError: string | null = null;
+          const maxAllocatableCapital = (totalAccountedValue * maxAllocationBps) / 10_000n;
+          const guardrailBudget =
+            maxAllocatableCapital < availableLiquidity ? maxAllocatableCapital : availableLiquidity;
+          const configuredTradeBudget = BigInt(
+            Math.max(1, Math.floor(this.config.strategyMaxTradeDusdc * 1_000_000)),
+          );
+          const strategyBudget =
+            configuredTradeBudget < guardrailBudget ? configuredTradeBudget : guardrailBudget;
+
+          for (const candidate of previewCandidates) {
+            const lowerStrike = BigInt(candidate.lowerStrikeUSD) * strikeMultiplier;
+            const higherStrike = BigInt(candidate.higherStrikeUSD) * strikeMultiplier;
+            try {
+              console.log(
+                `[Scheduler] Previewing strategy bounds: $${candidate.lowerStrikeUSD} - $${candidate.higherStrikeUSD} (${candidate.reason})`,
+              );
+              const candidatePreview = await this.axisAgent.previewRangeTrade({
+                oracleId: targetOracle.oracleId,
+                expiry: targetOracle.expiry,
+                lowerStrike,
+                higherStrike,
+                quantity: 1_000_000n,
+              });
+              if (BigInt(candidatePreview.mintCost) === 0n) {
+                lastPreviewError = `Preview returned 0 cost for $${candidate.lowerStrikeUSD} - $${candidate.higherStrikeUSD}.`;
+                continue;
+              }
+
+              const baseMintCost = BigInt(candidatePreview.mintCost);
+              if (strategyBudget < baseMintCost) {
+                lastPreviewError =
+                  `Trade budget ${(Number(strategyBudget) / 1_000_000).toFixed(2)} USDC is below preview cost ` +
+                  `${(Number(baseMintCost) / 1_000_000).toFixed(2)} USDC for $${candidate.lowerStrikeUSD} - $${candidate.higherStrikeUSD}.`;
+                continue;
+              }
+
+              const maxQuantity = (strategyBudget * 1_000_000n) / baseMintCost;
+              let targetQuantity = (maxQuantity * 98n) / 100n;
+              if (targetQuantity < 1_000_000n) {
+                targetQuantity = 1_000_000n;
+              }
+
+              const finalCost = (baseMintCost * targetQuantity) / 1_000_000n;
+              if (finalCost > strategyBudget) {
+                lastPreviewError =
+                  `Scaled strategy exceeds budget for $${candidate.lowerStrikeUSD} - $${candidate.higherStrikeUSD}.`;
+                continue;
+              }
+
+              const executionPreview = await this.axisAgent.canOpenRangeStrategy({
+                oracleId: targetOracle.oracleId,
+                expiry: targetOracle.expiry,
+                lowerStrike,
+                higherStrike,
+                quantity: targetQuantity,
+              });
+
+              if (!executionPreview.ok) {
+                lastPreviewError = executionPreview.error ?? 'Unknown PTB simulation failure.';
+                console.warn(
+                  `[Scheduler] Full PTB preview failed for $${candidate.lowerStrikeUSD} - $${candidate.higherStrikeUSD}: ${lastPreviewError}`,
+                );
+                continue;
+              }
+
+              chosenRange = candidate;
+              chosenQuantity = targetQuantity;
+              chosenFinalCost = finalCost;
+              break;
+            } catch (error) {
+              lastPreviewError = error instanceof Error ? error.message : String(error);
+              console.warn(
+                `[Scheduler] Preview failed for $${candidate.lowerStrikeUSD} - $${candidate.higherStrikeUSD}: ${lastPreviewError}`,
+              );
+            }
+          }
+
+          if (!chosenRange || !chosenQuantity || !chosenFinalCost) {
+            const message = lastPreviewError
+              ? `No executable strike range passed preview. Last error: ${lastPreviewError}`
+              : 'No tradable strike range passed preview.';
+            console.error(`[Scheduler] ${message}`);
+            this.addLog('SYSTEM', message, 'info');
+            return;
+          }
+
+          const lowerStrikeUSD = chosenRange.lowerStrikeUSD;
+          const higherStrikeUSD = chosenRange.higherStrikeUSD;
           const lowerStrike = BigInt(lowerStrikeUSD) * strikeMultiplier;
           const higherStrike = BigInt(higherStrikeUSD) * strikeMultiplier;
-          const expiry = BigInt(targetOracle.expiry);
+          const expiry = targetOracle.expiry;
 
-          // Dry-run/Preview to scale quantity dynamically
-          console.log(`[Scheduler] Previewing strategy bounds: $${lowerStrikeUSD} - $${higherStrikeUSD}`);
-          const preview = await this.axisAgent.previewRangeTrade({
-            oracleId: targetOracle.oracle_id,
-            expiry,
-            lowerStrike,
-            higherStrike,
-            quantity: 1_000_000n // Base quantity of 1.0 units
-          });
-
-          const baseMintCost = BigInt(preview.mintCost);
-          if (baseMintCost === 0n) {
-            console.error('[Scheduler] Preview returned 0 cost. Invalid strikes or pricing. Skipping.');
-            this.addLog('SYSTEM', 'Preview returned 0 cost. Invalid strikes or pricing.', 'info');
-            return;
+          if (chosenRange.reason !== 'AI-selected range') {
+            this.addLog(
+              'SYSTEM',
+              `Adjusted strikes to $${lowerStrikeUSD} - $${higherStrikeUSD} after preview fallback. Trade cap: $${this.config.strategyMaxTradeDusdc.toFixed(2)}.`,
+              'info',
+            );
           }
-
-          // Scale quantity to match 90% of available liquidity
-          const maxQuantity = (availableLiquidity * 1_000_000n) / baseMintCost;
-          let targetQuantity = (maxQuantity * 9n) / 10n;
-
-          if (targetQuantity < 1_000_000n) {
-            targetQuantity = 1_000_000n;
-          }
-
-          // Double check if we can afford the target quantity
-          const finalCost = (baseMintCost * targetQuantity) / 1_000_000n;
-          if (finalCost > availableLiquidity) {
-            console.error(`[Scheduler] Cannot afford scaled strategy. Cost: ${(Number(finalCost) / 1_000_000).toFixed(2)} USDC, Available: ${(Number(availableLiquidity) / 1_000_000).toFixed(2)} USDC.`);
-            this.addLog('SYSTEM', `Cannot afford scaled strategy. Cost: ${(Number(finalCost) / 1_000_000).toFixed(2)} USDC.`, 'info');
-            return;
-          }
-
-          console.log(`[Scheduler] [ACTION] Opening range strategy. Quantity: ${(Number(targetQuantity) / 1_000_000).toFixed(2)} units. Estimated cost: ${(Number(finalCost) / 1_000_000).toFixed(2)} USDC...`);
+          console.log(`[Scheduler] [ACTION] Opening range strategy. Quantity: ${(Number(chosenQuantity) / 1_000_000).toFixed(2)} units. Estimated cost: ${(Number(chosenFinalCost) / 1_000_000).toFixed(2)} USDC. Trade cap: ${this.config.strategyMaxTradeDusdc.toFixed(2)} USDC...`);
           
           const result = await this.axisAgent.openRangeStrategy({
-            oracleId: targetOracle.oracle_id,
+            oracleId: targetOracle.oracleId,
             expiry,
             lowerStrike,
             higherStrike,
-            quantity: targetQuantity
+            quantity: chosenQuantity
           });
 
           const ticketIdStr = result.ticketId ?? 'unknown';

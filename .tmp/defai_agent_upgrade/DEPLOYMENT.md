@@ -2,7 +2,7 @@
 
 Status on Sui testnet:
 
-- `Package ID`: `0x648d599af57d2f19dd42ffbd2a9a9baf72ab590db9aac0af09a00c1a7236baf9`
+- `Package ID`: `0x1e187d75eb1a901a8fa171c3a518caa4506faa0bc5ac29c8c224e002ad67b467`
 - `AdminCap`: `0x0863f7f339e0969de3e58f26e0d38afad93aa3ff0908a9d000902760dd7789a8`
 - `Vault<dUSDC>`: `0x4a6aaa5b41421f6368745bfa4f8019b157673b9d0c83c530d36177b7266852da`
 - `AgentCap`: `0xa0c596dc19015d7f2e28c883109a92bb992bf8ea8565558f186bdb4811c351d8`

@@ -3,13 +3,23 @@
 import React, { useState, useEffect } from "react";
 import { useCurrentAccount, useCurrentClient } from "@mysten/dapp-kit-react";
 import LiquidChrome from "../../../components/LiquidChrome";
-import ScrollReveal from "../../../components/ScrollReveal";
+import {
+  fetchBackendJson,
+  getBackendUrl,
+  isAbortError,
+  isAxisShareCoinType,
+} from "../backend";
 import { dashboardMock } from "../mock";
-import { DashboardView } from "../types";
+import { DashboardView, PortfolioHeroData } from "../types";
 import ActivityLogPanel from "./ActivityLogPanel";
 import ActivityPulsePanel from "./ActivityPulsePanel";
 import AgentReasoningPanel from "./AgentReasoningPanel";
 import DashboardSideNav from "./DashboardSideNav";
+import {
+  ActivitySkeleton,
+  OverviewSkeleton,
+  VaultSkeleton,
+} from "./DashboardSkeleton";
 import DashboardTopbar from "./DashboardTopbar";
 import OracleTimelinePanel from "./OracleTimelinePanel";
 import PortfolioHeroPanel from "./PortfolioHeroPanel";
@@ -57,59 +67,90 @@ export default function DashboardShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeView, setActiveView] = useState<DashboardView>("overview");
 
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+  const backendUrl = getBackendUrl();
 
   // Backend States
   const [vaultSummary, setVaultSummary] = useState<any>(null);
   const [agentStatus, setAgentStatus] = useState<any>(null);
   const [activeOracleState, setActiveOracleState] = useState<any>(null);
+  const [backendLoaded, setBackendLoaded] = useState(false);
 
   // User Balances
   const [userDusdcBalance, setUserDusdcBalance] = useState<string>("0.00");
   const [userPusdcBalance, setUserPusdcBalance] = useState<string>("0.00");
+  const [userPusdcRawBalance, setUserPusdcRawBalance] = useState<number>(0);
+  const [walletLoaded, setWalletLoaded] = useState(false);
 
   // Fetch backend status
   useEffect(() => {
+    let disposed = false;
+
     const fetchBackendData = async () => {
+      const controller = new AbortController();
       try {
-        const vaultRes = await fetch(`${backendUrl}/vault/summary`);
-        if (vaultRes.ok) {
-          const s = await vaultRes.json();
+        const s = await fetchBackendJson<any>("/vault/summary", {
+          signal: controller.signal,
+        });
+        if (!disposed) {
           setVaultSummary(s);
         }
 
         let currentAgentStatus = null;
-        const agentRes = await fetch(`${backendUrl}/agent/status`);
-        if (agentRes.ok) {
-          const a = await agentRes.json();
+        const a = await fetchBackendJson<any>("/agent/status", {
+          signal: controller.signal,
+        });
+        if (!disposed) {
           setAgentStatus(a);
           currentAgentStatus = a;
         }
 
-        const oraclesRes = await fetch(`${backendUrl}/predict/oracles`);
-        if (oraclesRes.ok) {
-          const oracles = await oraclesRes.json();
-          const active = oracles.filter((o: any) => o.status === "active");
-          if (active.length > 0) {
-            let targetOracleId = active[0].oracle_id;
-            if (currentAgentStatus?.activeStrategy?.oracleId) {
-              targetOracleId = currentAgentStatus.activeStrategy.oracleId;
-            }
-            const stateRes = await fetch(`${backendUrl}/predict/oracles/${targetOracleId}/state`);
-            if (stateRes.ok) {
-              const state = await stateRes.json();
-              setActiveOracleState(state);
-            }
+        const oracles = await fetchBackendJson<any[]>("/predict/oracles", {
+          signal: controller.signal,
+        });
+        const active = oracles.filter((o: any) => o.status === "active");
+        if (active.length > 0) {
+          let targetOracleId = active[0].oracle_id;
+          if (currentAgentStatus?.activeStrategy?.oracleId) {
+            targetOracleId = currentAgentStatus.activeStrategy.oracleId;
+          }
+          const state = await fetchBackendJson<any>(
+            `/predict/oracles/${targetOracleId}/state`,
+            {
+              signal: controller.signal,
+            },
+          );
+          if (!disposed) {
+            setActiveOracleState(state);
           }
         }
+        if (!disposed) {
+          setBackendLoaded(true);
+        }
       } catch (err) {
+        if (disposed || isAbortError(err)) {
+          return;
+        }
+        if (!disposed) {
+          setBackendLoaded(true);
+        }
         console.error("Failed to fetch backend data:", err);
       }
+
+      return () => controller.abort();
     };
 
-    fetchBackendData();
-    const interval = setInterval(fetchBackendData, 8000);
-    return () => clearInterval(interval);
+    let cancelLastFetch: (() => void) | void;
+    const runFetch = async () => {
+      cancelLastFetch = await fetchBackendData();
+    };
+
+    runFetch();
+    const interval = setInterval(runFetch, 8000);
+    return () => {
+      disposed = true;
+      cancelLastFetch?.();
+      clearInterval(interval);
+    };
   }, [backendUrl]);
 
   // Fetch user balances from wallet
@@ -117,14 +158,17 @@ export default function DashboardShell() {
     if (!account || !client) {
       setUserDusdcBalance("0.00");
       setUserPusdcBalance("0.00");
+      setUserPusdcRawBalance(0);
+      setWalletLoaded(true);
       return;
     }
 
     const fetchUserBalances = async () => {
+      const controller = new AbortController();
       try {
-        const configRes = await fetch(`${backendUrl}/config/public`);
-        if (!configRes.ok) return;
-        const config = await configRes.json();
+        const config = await fetchBackendJson<any>("/config/public", {
+          signal: controller.signal,
+        });
 
         // 1. Get user dUSDC balance
         const dusdcRes: any = await client.getBalance({
@@ -137,23 +181,40 @@ export default function DashboardShell() {
         setUserDusdcBalance((totalDusdc / 1_000_000).toFixed(2));
 
         // 2. Get user pUSDC balance
-        const pusdcType = `${config.axisPackageId}::pusdc::PUSDC`;
-        const pusdcRes: any = await client.getBalance({
+        const allBalances: any[] = await client.getAllBalances({
           owner: account.address,
-          coinType: pusdcType,
         } as any);
-        const totalPusdc = pusdcRes?.totalBalance && !isNaN(Number(pusdcRes.totalBalance))
-          ? Number(pusdcRes.totalBalance)
-          : 0;
-        setUserPusdcBalance((totalPusdc / 1_000_000).toFixed(2));
+        const totalPusdc = allBalances
+          .filter((balance) => isAxisShareCoinType(String(balance.coinType ?? "")))
+          .reduce((sum, balance) => {
+            const next = Number(balance.totalBalance);
+            return sum + (isNaN(next) ? 0 : next);
+          }, 0);
+        setUserPusdcRawBalance(totalPusdc);
+        setUserPusdcBalance((totalPusdc / 1_000_000_000).toFixed(2));
+        setWalletLoaded(true);
       } catch (err) {
+        if (isAbortError(err)) {
+          return;
+        }
+        setWalletLoaded(true);
         console.error("Failed to fetch user balances:", err);
       }
+
+      return () => controller.abort();
     };
 
-    fetchUserBalances();
-    const interval = setInterval(fetchUserBalances, 6000);
-    return () => clearInterval(interval);
+    let cancelLastFetch: (() => void) | void;
+    const runFetch = async () => {
+      cancelLastFetch = await fetchUserBalances();
+    };
+
+    runFetch();
+    const interval = setInterval(runFetch, 6000);
+    return () => {
+      cancelLastFetch?.();
+      clearInterval(interval);
+    };
   }, [account, client, backendUrl]);
 
   // Derived properties for views
@@ -167,13 +228,24 @@ export default function DashboardShell() {
 
   const rawPusdcNum = Number(userPusdcBalance);
   const userPusdcNum = isNaN(rawPusdcNum) ? 0 : rawPusdcNum;
-  const userDepositedVal = userPusdcNum * sharePriceNum;
+  const userPortfolioRaw =
+    totalShares > 0
+      ? (userPusdcRawBalance / totalShares) * totalAccounted
+      : 0;
+  const userDepositedVal = userPortfolioRaw / 1_000_000;
 
   const totalVaultValueUsd = vaultSummary 
     ? `$${(totalAccounted / 1_000_000).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     : "$0.00";
 
   const totalPortfolioValueUsd = `$${userDepositedVal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const sharePerformancePct = (sharePriceNum - 1) * 100;
+  const formattedSharePerformance = `${sharePerformancePct >= 0 ? "+" : ""}${sharePerformancePct.toFixed(2)}%`;
+  const performanceTone: PortfolioHeroData["netPnl"]["tone"] =
+    sharePerformancePct > 0 ? "positive" : sharePerformancePct < 0 ? "negative" : "neutral";
+  const showOverviewSkeleton = !backendLoaded || (!!account && !walletLoaded);
+  const showVaultSkeleton = !backendLoaded;
+  const showActivitySkeleton = !backendLoaded;
 
   // Construct dynamic data objects
   const portfolioData = {
@@ -181,12 +253,12 @@ export default function DashboardShell() {
     depositedDusdc: `${userDepositedVal.toFixed(2)} dUSDC`,
     pusdcBalance: `${userPusdcNum.toFixed(2)} pUSDC`,
     netPnl: { 
-      value: sharePriceNum > 1.0 ? `+${((sharePriceNum - 1) * 100).toFixed(2)}%` : "+0.00%", 
-      positive: sharePriceNum >= 1.0 
+      value: formattedSharePerformance, 
+      tone: performanceTone,
     },
     shareGrowth: { 
-      value: sharePriceNum > 1.0 ? `+${((sharePriceNum - 1) * 100).toFixed(2)}%` : "+0.00%", 
-      positive: sharePriceNum >= 1.0 
+      value: formattedSharePerformance, 
+      tone: performanceTone,
     },
     vaultMode: (vaultSummary?.deployedCapital && Number(vaultSummary.deployedCapital) > 0 ? "active_roll" : "active_roll") as any,
     summary: vaultSummary && Number(vaultSummary.deployedCapital) > 0
@@ -386,54 +458,66 @@ export default function DashboardShell() {
             />
 
             {activeView === "overview" ? (
-              <div className="mt-8 grid gap-5 xl:grid-cols-12">
-                <ScrollReveal className="xl:col-span-12" variant="left">
-                  <PortfolioHeroPanel data={portfolioData} />
-                </ScrollReveal>
+              showOverviewSkeleton ? (
+                <OverviewSkeleton />
+              ) : (
+                <div className="mt-8 grid gap-5 xl:grid-cols-12">
+                  <div className="xl:col-span-12">
+                    <PortfolioHeroPanel data={portfolioData} />
+                  </div>
 
-                <ScrollReveal className="xl:col-span-12" delay={90} variant="rise">
-                  <VaultActionPanel data={dashboardMock.actions} />
-                </ScrollReveal>
-              </div>
+                  <div className="xl:col-span-12">
+                    <VaultActionPanel data={dashboardMock.actions} />
+                  </div>
+                </div>
+              )
             ) : null}
 
             {activeView === "vault" ? (
-              <div className="mt-8 grid gap-5 xl:grid-cols-12">
-                <ScrollReveal className="xl:col-span-4" variant="left">
-                  <VaultStatusPanel data={vaultData} />
-                </ScrollReveal>
+              showVaultSkeleton ? (
+                <VaultSkeleton />
+              ) : (
+                <div className="mt-8 grid gap-5 xl:grid-cols-12">
+                  <div className="xl:col-span-4">
+                    <VaultStatusPanel data={vaultData} />
+                  </div>
 
-                <ScrollReveal className="xl:col-span-8" delay={70} variant="left">
-                  <RiskGuardrailsPanel data={dashboardMock.risk} />
-                </ScrollReveal>
+                  <div className="xl:col-span-8">
+                    <RiskGuardrailsPanel data={dashboardMock.risk} />
+                  </div>
 
-                <ScrollReveal className="xl:col-span-12" delay={100} variant="glow">
-                  <RangeDeploymentPanel data={rangeChartData} />
-                </ScrollReveal>
-              </div>
+                  <div className="xl:col-span-12">
+                    <RangeDeploymentPanel data={rangeChartData} />
+                  </div>
+                </div>
+              )
             ) : null}
 
             {activeView === "activity" ? (
-              <div className="mt-8 grid gap-5 xl:grid-cols-12">
-                <ScrollReveal className="xl:col-span-4" variant="left">
-                  <ActivityPulsePanel
-                    activity={activityData}
-                    oracle={oracleData}
-                  />
-                </ScrollReveal>
+              showActivitySkeleton ? (
+                <ActivitySkeleton />
+              ) : (
+                <div className="mt-8 grid gap-5 xl:grid-cols-12">
+                  <div className="xl:col-span-4">
+                    <ActivityPulsePanel
+                      activity={activityData}
+                      oracle={oracleData}
+                    />
+                  </div>
 
-                <ScrollReveal className="xl:col-span-8" delay={70} variant="right">
-                  <AgentReasoningPanel data={reasoningData} />
-                </ScrollReveal>
+                  <div className="xl:col-span-8">
+                    <AgentReasoningPanel data={reasoningData} />
+                  </div>
 
-                <ScrollReveal className="xl:col-span-4" delay={100} variant="rise">
-                  <OracleTimelinePanel data={oracleData} />
-                </ScrollReveal>
+                  <div className="xl:col-span-4">
+                    <OracleTimelinePanel data={oracleData} />
+                  </div>
 
-                <ScrollReveal className="xl:col-span-8" delay={120} variant="scale">
-                  <ActivityLogPanel data={activityData} />
-                </ScrollReveal>
-              </div>
+                  <div className="xl:col-span-8">
+                    <ActivityLogPanel data={activityData} />
+                  </div>
+                </div>
+              )
             ) : null}
           </div>
         </div>

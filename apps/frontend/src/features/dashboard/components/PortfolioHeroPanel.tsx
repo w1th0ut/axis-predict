@@ -27,19 +27,19 @@ export default function PortfolioHeroPanel({
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard
-            label="Your Deposited dUSDC"
+            label="Current Claim Value"
             value={data.depositedDusdc}
           />
-          <MetricCard label="Your pUSDC Shares" value={data.pusdcBalance} />
+          <MetricCard label="Vault Shares Held" value={data.pusdcBalance} />
           <MetricCard
             label="Your Net PnL"
             value={data.netPnl.value}
-            accent={data.netPnl.positive}
+            tone={data.netPnl.tone}
           />
           <MetricCard
             label="Vault Share Growth"
             value={data.shareGrowth.value}
-            accent={data.shareGrowth.positive}
+            tone={data.shareGrowth.tone}
           />
         </div>
       </div>
@@ -50,22 +50,25 @@ export default function PortfolioHeroPanel({
 function MetricCard({
   label,
   value,
-  accent,
+  tone,
 }: {
   label: string;
   value: string;
-  accent?: boolean;
+  tone?: "positive" | "negative" | "neutral";
 }) {
+  const toneClass =
+    tone === "positive"
+      ? "text-[var(--axis-primary)]"
+      : tone === "negative"
+        ? "text-[#ef5f7a]"
+        : "text-[var(--axis-text-primary)]";
+
   return (
     <div className="rounded-[1rem] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-4">
       <div className="font-mono text-[0.68rem] uppercase tracking-[0.16em] text-[var(--axis-text-muted)]">
         {label}
       </div>
-      <div
-        className={`mt-3 text-[1.15rem] font-medium ${
-          accent ? "text-[var(--axis-primary)]" : "text-[var(--axis-text-primary)]"
-        }`}
-      >
+      <div className={`mt-3 text-[1.15rem] font-medium ${toneClass}`}>
         {value}
       </div>
     </div>

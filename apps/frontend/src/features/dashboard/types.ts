@@ -27,8 +27,8 @@ export interface PortfolioHeroData {
   totalValueUsd: string;
   depositedDusdc: string;
   pusdcBalance: string;
-  netPnl: { value: string; positive: boolean };
-  shareGrowth: { value: string; positive: boolean };
+  netPnl: { value: string; tone: "positive" | "negative" | "neutral" };
+  shareGrowth: { value: string; tone: "positive" | "negative" | "neutral" };
   vaultMode: VaultMode;
   summary: string;
 }

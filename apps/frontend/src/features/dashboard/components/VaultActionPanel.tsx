@@ -8,6 +8,12 @@ import {
   CurrentAccountSigner,
 } from "@mysten/dapp-kit-react";
 import { Transaction } from "@mysten/sui/transactions";
+import {
+  fetchBackendJson,
+  getBackendUrl,
+  isAbortError,
+  isAxisShareCoinType,
+} from "../backend";
 import DashboardPanel from "./DashboardPanel";
 import { VaultActionPanelData } from "../types";
 
@@ -28,33 +34,48 @@ export default function VaultActionPanel({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+  const backendUrl = getBackendUrl();
 
   // Live on-chain balances
   const [dusdcBalance, setDusdcBalance] = useState<string>("0.00");
   const [pusdcBalance, setPusdcBalance] = useState<string>("0.00");
+  const [pusdcRawBalance, setPusdcRawBalance] = useState<number>(0);
   const [sharePrice, setSharePrice] = useState<string>("1.000");
+  const [shareCoinType, setShareCoinType] = useState<string | null>(null);
 
   // Fetch configs and vault exchange rate
   useEffect(() => {
     const fetchVaultData = async () => {
+      const controller = new AbortController();
       try {
-        const res = await fetch(`${backendUrl}/vault/summary`);
-        if (res.ok) {
-          const summary = await res.json();
-          const accounted = Number(summary.totalAccountedValue);
-          const shares = Number(summary.totalShares);
-          const price = shares > 0 ? (accounted / shares).toFixed(3) : "1.000";
-          setSharePrice(price);
-        }
+        const summary = await fetchBackendJson<any>("/vault/summary", {
+          signal: controller.signal,
+        });
+        const accounted = Number(summary.totalAccountedValue);
+        const shares = Number(summary.totalShares);
+        const price = shares > 0 ? (accounted / shares).toFixed(3) : "1.000";
+        setSharePrice(price);
       } catch (err) {
+        if (isAbortError(err)) {
+          return;
+        }
         console.error("Failed to fetch vault state:", err);
       }
+
+      return () => controller.abort();
     };
 
-    fetchVaultData();
-    const interval = setInterval(fetchVaultData, 8000);
-    return () => clearInterval(interval);
+    let cancelLastFetch: (() => void) | void;
+    const runFetch = async () => {
+      cancelLastFetch = await fetchVaultData();
+    };
+
+    runFetch();
+    const interval = setInterval(runFetch, 8000);
+    return () => {
+      cancelLastFetch?.();
+      clearInterval(interval);
+    };
   }, [backendUrl]);
 
   // Fetch user balances
@@ -62,14 +83,17 @@ export default function VaultActionPanel({
     if (!account || !client) {
       setDusdcBalance("0.00");
       setPusdcBalance("0.00");
+      setPusdcRawBalance(0);
+      setShareCoinType(null);
       return;
     }
 
     const fetchUserBalances = async () => {
+      const controller = new AbortController();
       try {
-        const configRes = await fetch(`${backendUrl}/config/public`);
-        if (!configRes.ok) return;
-        const config = await configRes.json();
+        const config = await fetchBackendJson<any>("/config/public", {
+          signal: controller.signal,
+        });
 
         // 1. Get user dUSDC balance
         const dusdcRes: any = await client.getBalance({
@@ -82,23 +106,42 @@ export default function VaultActionPanel({
         setDusdcBalance((totalDusdc / 1_000_000).toFixed(2));
 
         // 2. Get user pUSDC balance
-        const pusdcType = `${config.axisPackageId}::pusdc::PUSDC`;
-        const pusdcRes: any = await client.getBalance({
+        const allBalances: any[] = await client.getAllBalances({
           owner: account.address,
-          coinType: pusdcType,
         } as any);
-        const totalPusdc = pusdcRes?.totalBalance && !isNaN(Number(pusdcRes.totalBalance))
-          ? Number(pusdcRes.totalBalance)
-          : 0;
-        setPusdcBalance((totalPusdc / 1_000_000).toFixed(2));
+        const detectedShareBalance = allBalances.find((balance) =>
+          isAxisShareCoinType(String(balance.coinType ?? "")),
+        );
+        setShareCoinType(detectedShareBalance?.coinType ?? null);
+        const totalPusdc = allBalances
+          .filter((balance) => isAxisShareCoinType(String(balance.coinType ?? "")))
+          .reduce((sum, balance) => {
+            const next = Number(balance.totalBalance);
+            return sum + (isNaN(next) ? 0 : next);
+          }, 0);
+        setPusdcRawBalance(totalPusdc);
+        setPusdcBalance((totalPusdc / 1_000_000_000).toFixed(2));
       } catch (err) {
+        if (isAbortError(err)) {
+          return;
+        }
         console.error("Failed to fetch user balances:", err);
       }
+
+      return () => controller.abort();
     };
 
-    fetchUserBalances();
-    const interval = setInterval(fetchUserBalances, 6000);
-    return () => clearInterval(interval);
+    let cancelLastFetch: (() => void) | void;
+    const runFetch = async () => {
+      cancelLastFetch = await fetchUserBalances();
+    };
+
+    runFetch();
+    const interval = setInterval(runFetch, 6000);
+    return () => {
+      cancelLastFetch?.();
+      clearInterval(interval);
+    };
   }, [account, client, backendUrl]);
 
   const handleAction = async () => {
@@ -118,13 +161,11 @@ export default function VaultActionPanel({
     setSuccessMsg(null);
 
     try {
-      const configRes = await fetch(`${backendUrl}/config/public`);
-      if (!configRes.ok) {
-        throw new Error("Failed to load backend configurations.");
-      }
-      const config = await configRes.json();
+      const config = await fetchBackendJson<any>("/config/public");
 
-      const rawAmount = BigInt(Math.floor(val * 1_000_000));
+      const rawAmount = BigInt(
+        Math.floor(val * (activeTab === "deposit" ? 1_000_000 : 1_000_000_000)),
+      );
       const tx = new Transaction();
       tx.setGasBudget(50_000_000);
 
@@ -171,7 +212,7 @@ export default function VaultActionPanel({
         tx.transferObjects([sharesCoin], tx.pure.address(account.address));
       } else {
         // Withdraw PUSDC shares -> DUSDC
-        const pusdcType = `${config.axisPackageId}::pusdc::PUSDC`;
+        const pusdcType = shareCoinType ?? `${config.axisPackageId}::pusdc::PUSDC`;
         const coinsRes = await (client as any).getCoins({
           owner: account.address,
           coinType: pusdcType,
@@ -239,8 +280,14 @@ export default function VaultActionPanel({
   const outputAssetLabel = activeTab === "deposit" ? "pUSDC" : "dUSDC";
   const estimatedOutput =
     activeTab === "deposit"
-      ? (parseFloat(amount || "0") / parseFloat(sharePrice)).toFixed(2)
-      : (parseFloat(amount || "0") * parseFloat(sharePrice)).toFixed(2);
+      ? (
+          ((parseFloat(amount || "0") * 1_000_000) / parseFloat(sharePrice)) /
+          1_000_000_000
+        ).toFixed(4)
+      : (
+          ((parseFloat(amount || "0") * 1_000_000_000 * parseFloat(sharePrice)) /
+            1_000_000) 
+        ).toFixed(2);
 
   return (
     <DashboardPanel className="h-full min-h-[18rem] p-7 sm:p-8">

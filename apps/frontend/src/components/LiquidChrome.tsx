@@ -23,9 +23,11 @@ export default function LiquidChrome({
   ...props
 }: LiquidChromeProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const baseColorKey = `${baseColor[0]}:${baseColor[1]}:${baseColor[2]}`;
 
   useEffect(() => {
     const container = containerRef.current;
+    const [baseR, baseG, baseB] = baseColor;
 
     if (!container) {
       return;
@@ -78,7 +80,12 @@ export default function LiquidChrome({
         float ripple = sin(10.0 * dist - uTime * 2.0) * 0.03;
         uv += (diff / (dist + 0.0001)) * ripple * falloff;
 
-        vec3 color = uBaseColor / abs(sin(uTime - uv.y - uv.x));
+        float wave = abs(sin(uTime - uv.y - uv.x));
+        float chrome = max(wave, 0.22);
+        float sheen = pow(1.0 - chrome, 1.8);
+        vec3 color = uBaseColor * (0.72 + 0.24 / chrome);
+        color = mix(color, vec3(0.92, 0.96, 1.0), min(sheen * 0.42, 0.42));
+        color = min(color, vec3(0.96, 0.98, 1.0));
         return vec4(color, 1.0);
       }
 
@@ -111,7 +118,7 @@ export default function LiquidChrome({
             gl.canvas.width / Math.max(gl.canvas.height, 1),
           ]),
         },
-        uBaseColor: { value: new Float32Array(baseColor) },
+        uBaseColor: { value: new Float32Array([baseR, baseG, baseB]) },
         uAmplitude: { value: amplitude },
         uFrequencyX: { value: frequencyX },
         uFrequencyY: { value: frequencyY },
@@ -185,7 +192,7 @@ export default function LiquidChrome({
 
       gl.getExtension("WEBGL_lose_context")?.loseContext();
     };
-  }, [amplitude, baseColor, frequencyX, frequencyY, interactive, speed]);
+  }, [amplitude, baseColorKey, frequencyX, frequencyY, interactive, speed]);
 
   return (
     <div

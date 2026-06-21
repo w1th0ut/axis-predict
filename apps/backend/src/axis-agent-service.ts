@@ -9,6 +9,7 @@ import {
 } from './config.js';
 import { PredictApiClient } from './predict-api.js';
 import {
+  assertTransactionSuccess,
   decodeU64,
   extractReturnBytes,
   findObjectChangeId,
@@ -40,6 +41,12 @@ interface StrategyTicketSnapshot {
   higherStrike: bigint;
 }
 
+interface PreparedOpenRangeStrategy {
+  tx: Transaction;
+  preview: Awaited<ReturnType<AxisAgentService['previewRangeTrade']>>;
+  strategyBudget: bigint;
+}
+
 function toBigIntInput(value: string | number | bigint, label: string) {
   try {
     return typeof value === 'bigint' ? value : BigInt(value);
@@ -52,6 +59,15 @@ function stringifyBigints<T>(value: T): T {
   return JSON.parse(
     JSON.stringify(value, (_key, current) => (typeof current === 'bigint' ? current.toString() : current)),
   ) as T;
+}
+
+function scalePredictPrice(value: bigint) {
+  return Number(value) / 1_000_000_000;
+}
+
+function isOracleNotQuoteableError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('assert_quoteable_oracle') || message.includes('oracle_config');
 }
 
 export class AxisAgentService {
@@ -93,16 +109,77 @@ export class AxisAgentService {
   async getManagerStatus() {
     assertPredictManagerConfig(this.config);
     const onchainBalance = await this.inspectManagerQuoteBalance();
-    const summary = await this.predictApi.getManagerSummary(this.config.predictManagerId);
-    const positions = await this.predictApi.getManagerPositionsSummary(this.config.predictManagerId);
+    const activeStrategy = await this.getActiveStrategySnapshot();
+
+    let summary: any = null;
+    let summaryError: string | null = null;
+    try {
+      summary = await this.predictApi.getManagerSummary(this.config.predictManagerId);
+    } catch (error) {
+      summaryError = error instanceof Error ? error.message : String(error);
+    }
+
+    let positions: any[] = [];
+    let positionsError: string | null = null;
+    try {
+      const response = await this.predictApi.getManagerPositionsSummary(this.config.predictManagerId);
+      positions = Array.isArray(response) ? response : [];
+    } catch (error) {
+      positionsError = error instanceof Error ? error.message : String(error);
+    }
+
+    const usedOnchainFallbackPositions = positions.length === 0 && activeStrategy !== null;
+
+    if (usedOnchainFallbackPositions) {
+      positions = [
+        {
+          source: 'onchain_ticket',
+          status: 'active',
+          ticket_id: activeStrategy.id,
+          oracle_id: activeStrategy.oracleId,
+          lower_strike: activeStrategy.lowerStrike.toString(),
+          higher_strike: activeStrategy.higherStrike.toString(),
+          lower_strike_usd: scalePredictPrice(activeStrategy.lowerStrike),
+          higher_strike_usd: scalePredictPrice(activeStrategy.higherStrike),
+          expiry: activeStrategy.expiry.toString(),
+          quantity: activeStrategy.quantity.toString(),
+          allocated_amount: activeStrategy.allocatedAmount.toString(),
+        },
+      ];
+    }
+
+    const derivedSummary =
+      activeStrategy && summary
+        ? {
+            ...summary,
+            open_exposure:
+              Number(summary.open_exposure ?? 0) > 0
+                ? summary.open_exposure
+                : activeStrategy.allocatedAmount.toString(),
+            open_positions:
+              Number(summary.open_positions ?? 0) > 0 ? summary.open_positions : 1,
+            account_value:
+              Number(summary.account_value ?? 0) > 0
+                ? summary.account_value
+                : activeStrategy.allocatedAmount.toString(),
+          }
+        : summary;
 
     return {
       managerId: this.config.predictManagerId,
       owner: this.getAgentAddress(),
       quoteAssetType: this.config.quoteAssetType,
       onchainQuoteBalance: onchainBalance.toString(),
-      summary,
+      summary: derivedSummary,
       positions,
+      activeStrategy: activeStrategy ? stringifyBigints(activeStrategy) : null,
+      indexerStatus: {
+        summaryAvailable: Boolean(summary),
+        positionsAvailable: positionsError === null,
+        usedOnchainFallbackPositions,
+        summaryError,
+        positionsError,
+      },
     };
   }
 
@@ -131,6 +208,7 @@ export class AxisAgentService {
         },
       } as never),
     );
+    assertTransactionSuccess(result, 'PredictManager creation');
 
     return {
       digest: result.digest,
@@ -194,11 +272,6 @@ export class AxisAgentService {
       throw new Error('Agent signer is not available.');
     }
 
-    const quantity = toBigIntInput(input.quantity, 'quantity');
-    const expiry = toBigIntInput(input.expiry, 'expiry');
-    const lowerStrike = toBigIntInput(input.lowerStrike, 'lowerStrike');
-    const higherStrike = toBigIntInput(input.higherStrike, 'higherStrike');
-
     const managerBalance = await this.inspectManagerQuoteBalance();
     if (managerBalance !== 0n) {
       throw new Error(
@@ -206,33 +279,139 @@ export class AxisAgentService {
       );
     }
 
+    const { tx, preview } = await this.prepareOpenRangeStrategy(input);
+    const allocation = null;
+    void allocation;
+    const signerAddress = signer.toSuiAddress();
+
+    const inspect = await this.client.devInspectTransactionBlock({
+      sender: signerAddress,
+      transactionBlock: tx,
+    } as never);
+    const inspectStatus =
+      typeof inspect?.effects?.status === 'string'
+        ? inspect.effects.status
+        : inspect?.effects?.status?.status;
+    if (inspectStatus && inspectStatus !== 'success') {
+      const inspectError =
+        inspect?.effects?.status?.error ??
+        inspect?.error ??
+        JSON.stringify(inspect?.effects?.status ?? inspect);
+      throw new Error(`Open strategy simulation failed. ${inspectError}`);
+    }
+
+    const result = unwrapTransactionResult(
+      await this.client.signAndExecuteTransaction({
+        signer,
+        transaction: tx,
+        options: {
+          showEffects: true,
+          showObjectChanges: true,
+          showEvents: true,
+          showBalanceChanges: true,
+        },
+      } as never),
+    );
+    assertTransactionSuccess(result, 'Range strategy open');
+
+    let finalAllocationAmount = preview.mintCost;
+    let ticketId =
+      findObjectChangeId(result, '::axis_vault::StrategyTicket') ??
+      result.objectChanges?.find(
+        (change: any) =>
+          typeof change?.objectType === 'string' &&
+          change.objectType.includes('::axis_vault::StrategyTicket') &&
+          (change?.owner?.AddressOwner === signerAddress ||
+            change?.owner?.ObjectOwner === signerAddress),
+      )?.objectId;
+    const allocatedEvent = result.events?.find(
+      (ev: any) => ev.type.includes('::axis_vault::StrategyAllocated'),
+    );
+    if (allocatedEvent && allocatedEvent.parsedJson) {
+      finalAllocationAmount = allocatedEvent.parsedJson.allocated_amount;
+    }
+    const reconciledEvent = result.events?.find(
+      (ev: any) => ev.type.includes('::axis_vault::StrategyBudgetReconciled'),
+    );
+    if (reconciledEvent && reconciledEvent.parsedJson?.final_allocated_amount) {
+      finalAllocationAmount = reconciledEvent.parsedJson.final_allocated_amount;
+    }
+    if (!ticketId) {
+      ticketId = await this.getActiveTicketId();
+    }
+
+    return stringifyBigints({
+      digest: result.digest,
+      ticketId,
+      allocationAmount: finalAllocationAmount,
+      preview,
+    });
+  }
+
+  async canOpenRangeStrategy(input: RangeTradeInput) {
+    assertAgentKey(this.config);
+    const signer = this.signer;
+    if (!signer) {
+      throw new Error('Agent signer is not available.');
+    }
+
+    try {
+      const { tx, preview } = await this.prepareOpenRangeStrategy(input);
+      const inspect = await this.client.devInspectTransactionBlock({
+        sender: signer.toSuiAddress(),
+        transactionBlock: tx,
+      } as never);
+      const inspectStatus =
+        typeof inspect?.effects?.status === 'string'
+          ? inspect.effects.status
+          : inspect?.effects?.status?.status;
+      if (inspectStatus && inspectStatus !== 'success') {
+        return {
+          ok: false,
+          preview,
+          error:
+            inspect?.effects?.status?.error ??
+            inspect?.error ??
+            JSON.stringify(inspect?.effects?.status ?? inspect),
+        };
+      }
+
+      return {
+        ok: true,
+        preview,
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  private async prepareOpenRangeStrategy(input: RangeTradeInput): Promise<PreparedOpenRangeStrategy> {
+    assertAxisRuntimeConfig(this.config);
+    assertPredictManagerConfig(this.config);
+
+    const quantity = toBigIntInput(input.quantity, 'quantity');
+    const expiry = toBigIntInput(input.expiry, 'expiry');
+    const lowerStrike = toBigIntInput(input.lowerStrike, 'lowerStrike');
+    const higherStrike = toBigIntInput(input.higherStrike, 'higherStrike');
+    const vaultSummary = await this.getVaultSummary();
+
     const preview = await this.previewRangeTrade(input);
+    const availableLiquidity = BigInt(vaultSummary.availableLiquidity);
+    const totalAccountedValue = BigInt(vaultSummary.totalAccountedValue);
+    const maxAllocationBps = BigInt(vaultSummary.maxAllocationBps);
+    const maxAllocatableCapital = (totalAccountedValue * maxAllocationBps) / 10_000n;
+    const strategyBudget =
+      maxAllocatableCapital < availableLiquidity ? maxAllocatableCapital : availableLiquidity;
+
+    if (strategyBudget <= 0n) {
+      throw new Error('Vault strategy budget is zero.');
+    }
 
     const tx = new Transaction();
     tx.setGasBudget(80_000_000);
-
-    const rangeKey = tx.moveCall({
-      target: `${this.config.predictPackageId}::range_key::new`,
-      arguments: [
-        tx.pure.id(input.oracleId),
-        tx.pure.u64(expiry),
-        tx.pure.u64(lowerStrike),
-        tx.pure.u64(higherStrike),
-      ],
-    });
-
-    const tradeAmounts = tx.moveCall({
-      target: `${this.config.predictPackageId}::predict::get_range_trade_amounts`,
-      arguments: [
-        tx.object(this.config.predictObjectId),
-        tx.object(input.oracleId),
-        rangeKey,
-        tx.pure.u64(quantity),
-        tx.object(this.config.clockObjectId),
-      ],
-    }) as any;
-
-    const dynamicCost = tradeAmounts[0];
 
     const allocation = tx.moveCall({
       target: `${this.config.axisPackageId}::axis_vault::allocate_range_position`,
@@ -240,7 +419,7 @@ export class AxisAgentService {
       arguments: [
         tx.object(this.config.axisAgentCapId),
         tx.object(this.config.axisVaultId),
-        dynamicCost,
+        tx.pure.u64(strategyBudget),
         tx.pure.u64(quantity),
         tx.pure.id(this.config.predictObjectId),
         tx.pure.id(this.config.predictManagerId),
@@ -282,35 +461,40 @@ export class AxisAgentService {
       ],
     });
 
-    tx.transferObjects([ticket], tx.pure.address(signer.toSuiAddress()));
-
-    const result = unwrapTransactionResult(
-      await this.client.signAndExecuteTransaction({
-        signer,
-        transaction: tx,
-        options: {
-          showEffects: true,
-          showObjectChanges: true,
-          showEvents: true,
-          showBalanceChanges: true,
-        },
-      } as never),
-    );
-
-    let finalAllocationAmount = preview.mintCost;
-    const allocatedEvent = result.events?.find(
-      (ev: any) => ev.type.includes('::axis_vault::StrategyAllocated'),
-    );
-    if (allocatedEvent && allocatedEvent.parsedJson) {
-      finalAllocationAmount = allocatedEvent.parsedJson.allocated_amount;
-    }
-
-    return stringifyBigints({
-      digest: result.digest,
-      ticketId: findObjectChangeId(result, '::axis_vault::StrategyTicket'),
-      allocationAmount: finalAllocationAmount,
-      preview,
+    const remainingManagerBalance = tx.moveCall({
+      target: `${this.config.predictPackageId}::predict_manager::balance`,
+      typeArguments: [this.config.quoteAssetType],
+      arguments: [tx.object(this.config.predictManagerId)],
     });
+
+    const leftoverCapital = tx.moveCall({
+      target: `${this.config.predictPackageId}::predict_manager::withdraw`,
+      typeArguments: [this.config.quoteAssetType],
+      arguments: [tx.object(this.config.predictManagerId), remainingManagerBalance],
+    }) as any;
+
+    const reconciledTicket = tx.moveCall({
+      target: `${this.config.axisPackageId}::axis_vault::reconcile_range_position_budget`,
+      typeArguments: [this.config.quoteAssetType],
+      arguments: [
+        tx.object(this.config.axisAgentCapId),
+        tx.object(this.config.axisVaultId),
+        ticket,
+        leftoverCapital,
+      ],
+    }) as any;
+
+    const signer = this.signer;
+    if (!signer) {
+      throw new Error('Agent signer is not available.');
+    }
+    tx.transferObjects([reconciledTicket], tx.pure.address(signer.toSuiAddress()));
+
+    return {
+      tx,
+      preview,
+      strategyBudget,
+    };
   }
 
   async settleRangeStrategy(ticketId: string) {
@@ -338,14 +522,22 @@ export class AxisAgentService {
       );
     }
 
-    const preview = await this.previewRangeTrade({
-      oracleId: ticket.oracleId,
-      expiry: ticket.expiry,
-      lowerStrike: ticket.lowerStrike,
-      higherStrike: ticket.higherStrike,
-      quantity: ticket.quantity,
-    });
-    const expectedPayout = BigInt(preview.redeemPayout);
+    let expectedPayout = 0n;
+    try {
+      const preview = await this.previewRangeTrade({
+        oracleId: ticket.oracleId,
+        expiry: ticket.expiry,
+        lowerStrike: ticket.lowerStrike,
+        higherStrike: ticket.higherStrike,
+        quantity: ticket.quantity,
+      });
+      expectedPayout = BigInt(preview.redeemPayout);
+    } catch (error) {
+      if (isOracleNotQuoteableError(error)) {
+        throw new Error('SETTLEMENT_NOT_READY: oracle is not quoteable yet for redeem preview.');
+      }
+      throw error;
+    }
 
     const tx = new Transaction();
     tx.setGasBudget(80_000_000);
@@ -420,6 +612,7 @@ export class AxisAgentService {
         },
       } as never),
     );
+    assertTransactionSuccess(result, 'Range strategy settle');
 
     return {
       digest: result.digest,
@@ -453,21 +646,33 @@ export class AxisAgentService {
     return this.getStrategyTicket(ticketId);
   }
 
+  async getActiveStrategySnapshot(): Promise<StrategyTicketSnapshot | null> {
+    const ticketId = await this.getActiveTicketId();
+    if (!ticketId) return null;
+    return this.getStrategyTicket(ticketId);
+  }
+
   async getActiveTicketId(): Promise<string | null> {
     assertAxisRuntimeConfig(this.config);
     const address = this.getAgentAddress();
     if (!address) return null;
 
-    const ticketType = `${this.config.axisPackageId}::axis_vault::StrategyTicket`;
     const response = (await this.client.getOwnedObjects({
       owner: address,
-      filter: {
-        StructType: ticketType,
+      options: {
+        showType: true,
+        showOwner: true,
       },
     } as any)) as any;
 
     if (response?.data && response.data.length > 0) {
-      return response.data[0].data?.objectId ?? null;
+      const ticket = response.data.find((item: any) => {
+        const objectType = item?.data?.type ?? item?.data?.content?.type ?? item?.type;
+        return typeof objectType === 'string' && objectType.endsWith('::axis_vault::StrategyTicket');
+      });
+      if (ticket) {
+        return ticket.data?.objectId ?? ticket.objectId ?? null;
+      }
     }
     return null;
   }

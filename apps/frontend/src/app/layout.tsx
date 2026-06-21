@@ -20,10 +20,33 @@ const instrumentSans = Instrument_Sans({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://axis-predict.vercel.app"),
   title: "Axis Predict - DeFAI Range Harvester",
   description: "DeFAI Range Harvester for DeepBook Predict Ecosystem. Optimize rolling expiry yields on Sui with mathematically enforced risk limits.",
   icons: {
     icon: "/logo.png",
+  },
+  openGraph: {
+    title: "Axis Predict - DeFAI Range Harvester",
+    description: "DeFAI Range Harvester for DeepBook Predict Ecosystem. Optimize rolling expiry yields on Sui with mathematically enforced risk limits.",
+    url: "https://axis-predict.vercel.app",
+    siteName: "Axis Predict",
+    images: [
+      {
+        url: "/og-banner.png",
+        width: 1200,
+        height: 630,
+        alt: "Axis Predict DeFAI Option Vault",
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Axis Predict - DeFAI Range Harvester",
+    description: "DeFAI Range Harvester for DeepBook Predict Ecosystem. Optimize rolling expiry yields on Sui with mathematically enforced risk limits.",
+    images: ["/og-banner.png"],
   },
 };
 

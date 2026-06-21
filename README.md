@@ -1,5 +1,12 @@
 # 🌌 Axis Predict: Autonomous DeFAI Option Vault on Sui
 
+![Axis Banner](./apps/frontend/public/og-banner.png)
+
+[![License: ISC](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Sui Testnet](https://img.shields.io/badge/Network-Sui%20Testnet-blueviolet.svg)](https://sui.io/)
+[![Sui Move 2024](https://img.shields.io/badge/Contracts-Sui%20Move%202024-teal.svg)](https://move-book.com/)
+[![TypeScript](https://img.shields.io/badge/Language-TypeScript-blue.svg)](https://www.typescriptlang.org/)
+
 Axis Predict is a decentralized, autonomous Delta-Neutral yield vault built on **Sui Testnet** that utilizes **DeepBook Predict** (a volatility-priced prediction/option market protocol) and an **AI Trading Agent** to capture yield from volatility.
 
 ---

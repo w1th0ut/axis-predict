@@ -10,6 +10,7 @@
     "build:be": "pnpm --filter backend build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "packageManager": "pnpm@11.7.0",
   "keywords": [],
   "author": "",
   "license": "ISC",

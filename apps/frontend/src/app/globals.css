@@ -1,27 +1,49 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --axis-background: #08090a;
+  --axis-surface: #121417;
+  --axis-surface-elevated: #171b1f;
+  --axis-border: #1e2227;
+  --axis-border-strong: #2c333b;
+  --axis-text-primary: #f3f4f6;
+  --axis-text-secondary: #ced3da;
+  --axis-text-muted: #9ca3af;
+  --axis-primary: #2e7cf6;
+  --axis-primary-strong: #2368d4;
+  --axis-success: #10b981;
+  --axis-alert: #ef4444;
+  --axis-ai: #06b6d4;
+  --axis-ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --axis-ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-manrope);
+  --color-background: var(--axis-background);
+  --color-foreground: var(--axis-text-primary);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-instrument-sans);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-manrope), sans-serif;
+  background:
+    radial-gradient(circle at top right, rgba(46, 124, 246, 0.06), transparent 26%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.01), rgba(255, 255, 255, 0)),
+    var(--axis-background);
+  color: var(--axis-text-primary);
+  font-family: var(--font-geist-sans), sans-serif;
+  font-size: 1rem;
+  line-height: 1.55;
+  font-kerning: normal;
+}
+
+.font-display {
+  font-family: var(--font-instrument-sans), sans-serif;
 }
 
 /* Tabular Numbers Utility */
@@ -29,8 +51,216 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.axis-grid {
+  background-image:
+    linear-gradient(to right, rgba(30, 34, 39, 0.5) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(30, 34, 39, 0.4) 1px, transparent 1px);
+  background-size: 7rem 7rem;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.88), rgba(0, 0, 0, 0.42));
+}
+
+.axis-float {
+  animation: axis-float 8s ease-in-out infinite;
+}
+
+.axis-nav-enter {
+  opacity: 0;
+  transform: translate3d(0, -14px, 0);
+  animation: axis-nav-enter 720ms var(--axis-ease-out-expo) 120ms forwards;
+}
+
+.axis-intro {
+  opacity: 0;
+  will-change: transform, opacity, filter;
+}
+
+.axis-intro--eyebrow {
+  animation: axis-intro-rise 760ms var(--axis-ease-out-expo) 180ms forwards;
+}
+
+.axis-intro--headline {
+  animation: axis-intro-rise 940ms var(--axis-ease-out-expo) 280ms forwards;
+}
+
+.axis-intro--copy {
+  animation: axis-intro-rise 820ms var(--axis-ease-out-expo) 430ms forwards;
+}
+
+.axis-intro--stats {
+  animation: axis-intro-rise 820ms var(--axis-ease-out-expo) 560ms forwards;
+}
+
+.axis-intro--visual {
+  animation: axis-hero-visual 1300ms var(--axis-ease-out-expo) 90ms forwards;
+}
+
+.axis-stat-reveal {
+  opacity: 0;
+  transform: translate3d(0, 18px, 0);
+  animation: axis-intro-rise 700ms var(--axis-ease-out-expo) forwards;
+  animation-delay: calc(640ms + (var(--axis-index, 0) * 90ms));
+}
+
+.axis-reveal {
+  transition:
+    opacity var(--axis-reveal-duration, 780ms) var(--axis-ease-out-expo) var(--axis-reveal-delay, 0ms),
+    transform var(--axis-reveal-duration, 780ms) var(--axis-ease-out-expo) var(--axis-reveal-delay, 0ms),
+    filter var(--axis-reveal-duration, 780ms) var(--axis-ease-out-expo) var(--axis-reveal-delay, 0ms),
+    box-shadow var(--axis-reveal-duration, 780ms) var(--axis-ease-out-expo) var(--axis-reveal-delay, 0ms);
+}
+
+.axis-reveal[data-ready="true"][data-state="hidden"] {
+  opacity: 0;
+}
+
+.axis-reveal[data-ready="true"][data-state="visible"] {
+  opacity: 1;
+  filter: blur(0);
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+.axis-reveal[data-ready="true"][data-state="hidden"][data-variant="rise"] {
+  transform: translate3d(0, 34px, 0);
+  filter: blur(18px);
+}
+
+.axis-reveal[data-ready="true"][data-state="hidden"][data-variant="left"] {
+  transform: translate3d(-40px, 0, 0);
+  filter: blur(14px);
+}
+
+.axis-reveal[data-ready="true"][data-state="hidden"][data-variant="right"] {
+  transform: translate3d(40px, 0, 0);
+  filter: blur(14px);
+}
+
+.axis-reveal[data-ready="true"][data-state="hidden"][data-variant="scale"] {
+  transform: translate3d(0, 24px, 0) scale(0.96);
+  filter: blur(18px);
+}
+
+.axis-reveal[data-ready="true"][data-state="hidden"][data-variant="glow"] {
+  transform: translate3d(0, 34px, 0) scale(0.985);
+  filter: blur(22px);
+  box-shadow: 0 0 0 rgba(46, 124, 246, 0);
+}
+
+.axis-reveal[data-ready="true"][data-state="visible"][data-variant="glow"] {
+  box-shadow: 0 0 80px rgba(46, 124, 246, 0.05);
+}
+
+/* ReactBits-inspired ferrofluid field */
+.axis-ferrofluid-node {
+  animation: axis-ferrofluid 11s ease-in-out infinite alternate;
+  box-shadow:
+    0 0 36px rgba(46, 124, 246, 0.22),
+    inset 0 0 24px rgba(255, 255, 255, 0.12);
+}
+
+.axis-border-glow,
+.axis-border-glow-blur {
+  background:
+    conic-gradient(
+      from 0deg,
+      rgba(46, 124, 246, 0) 0deg,
+      rgba(46, 124, 246, 0.16) 42deg,
+      rgba(84, 150, 255, 0.9) 90deg,
+      rgba(46, 124, 246, 0.18) 132deg,
+      rgba(46, 124, 246, 0) 180deg,
+      rgba(46, 124, 246, 0.14) 230deg,
+      rgba(84, 150, 255, 0.8) 286deg,
+      rgba(46, 124, 246, 0) 360deg
+    );
+  animation: axis-border-sweep 5.8s linear infinite;
+}
+
+.axis-border-glow {
+  opacity: 0.95;
+}
+
+.axis-border-glow-blur {
+  filter: blur(14px);
+  opacity: 0.72;
+  transform: scale(1.03);
+}
+
+@keyframes axis-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+
+  50% {
+    transform: translate3d(0, -8px, 0);
+  }
+}
+
+@keyframes axis-nav-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -14px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes axis-intro-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 32px, 0);
+    filter: blur(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+    filter: blur(0);
+  }
+}
+
+@keyframes axis-hero-visual {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 22px, 0) scale(1.02);
+    filter: blur(24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes axis-ferrofluid {
+  0% {
+    transform: translate3d(-10px, -6px, 0) scale(0.96);
+  }
+
+  100% {
+    transform: translate3d(14px, 16px, 0) scale(1.08);
+  }
+}
+
+@keyframes axis-border-sweep {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Reduced Motion Override */
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   * {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;

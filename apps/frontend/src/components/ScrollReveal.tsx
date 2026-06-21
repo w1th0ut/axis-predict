@@ -1,12 +1,60 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { CSSProperties, useEffect, useRef, useState } from "react";
 
-export default function ScrollReveal({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
-  const [isVisible, setIsVisible] = useState(false);
+type RevealVariant = "rise" | "left" | "right" | "scale" | "glow";
+
+interface ScrollRevealProps {
+  children: React.ReactNode;
+  className?: string;
+  delay?: number;
+  duration?: number;
+  threshold?: number;
+  variant?: RevealVariant;
+}
+
+export default function ScrollReveal({
+  children,
+  className,
+  delay = 0,
+  duration = 780,
+  threshold = 0.18,
+  variant = "rise",
+}: ScrollRevealProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const [isReady, setIsReady] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
+    const currentRef = ref.current;
+
+    if (!currentRef || typeof window === "undefined") {
+      return undefined;
+    }
+
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+
+    if (prefersReducedMotion) {
+      const reducedMotionFrame = window.requestAnimationFrame(() => {
+        setIsVisible(true);
+        setIsReady(true);
+      });
+
+      return () => {
+        window.cancelAnimationFrame(reducedMotionFrame);
+      };
+    }
+
+    const isInitiallyInView =
+      currentRef.getBoundingClientRect().top <= window.innerHeight * 0.9;
+
+    const revealFrame = window.requestAnimationFrame(() => {
+      setIsVisible(isInitiallyInView);
+      setIsReady(true);
+    });
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -14,27 +62,35 @@ export default function ScrollReveal({ children, delay = 0 }: { children: React.
           observer.unobserve(entry.target);
         }
       },
-      { threshold: 0.1, rootMargin: "0px 0px -50px 0px" }
+      {
+        threshold,
+        rootMargin: "0px 0px -10% 0px",
+      },
     );
 
-    if (ref.current) {
-      observer.observe(ref.current);
+    if (!isInitiallyInView) {
+      observer.observe(currentRef);
     }
 
     return () => {
-      if (ref.current) {
-        observer.unobserve(ref.current);
-      }
+      window.cancelAnimationFrame(revealFrame);
+      observer.disconnect();
     };
-  }, []);
+  }, [threshold]);
+
+  const style = {
+    "--axis-reveal-delay": `${delay}ms`,
+    "--axis-reveal-duration": `${duration}ms`,
+  } as CSSProperties;
 
   return (
     <div
       ref={ref}
-      className={`transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-        isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-      }`}
-      style={{ transitionDelay: `${delay}ms` }}
+      className={`axis-reveal ${className ?? ""}`.trim()}
+      data-ready={isReady ? "true" : "false"}
+      data-state={isVisible ? "visible" : "hidden"}
+      data-variant={variant}
+      style={style}
     >
       {children}
     </div>

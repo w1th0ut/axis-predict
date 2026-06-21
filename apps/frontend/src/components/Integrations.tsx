@@ -1,58 +1,104 @@
 "use client";
 
+import Image from "next/image";
 import React from "react";
 import ScrollReveal from "./ScrollReveal";
 
+interface IntegrationItem {
+  id: string;
+  name: string;
+  logoSrc: string;
+  logoWidthClass: string;
+}
+
+const INTEGRATIONS: IntegrationItem[] = [
+  {
+    id: "sui",
+    name: "Sui",
+    logoSrc: "/sui.png",
+    logoWidthClass: "w-16",
+  },
+  {
+    id: "deepbook",
+    name: "DeepBook Predict",
+    logoSrc: "/deepbook.png",
+    logoWidthClass: "w-40",
+  },
+  {
+    id: "openrouter",
+    name: "OpenRouter",
+    logoSrc: "/openrouter.png",
+    logoWidthClass: "w-14",
+  },
+  {
+    id: "mystenlabs",
+    name: "MystenLabs",
+    logoSrc: "/mystenlabs.png",
+    logoWidthClass: "w-44",
+  },
+  {
+    id: "react",
+    name: "React",
+    logoSrc: "/react.png",
+    logoWidthClass: "w-16",
+  },
+  {
+    id: "tailwind",
+    name: "Tailwind CSS",
+    logoSrc: "/tailwind.png",
+    logoWidthClass: "w-18 sm:w-20",
+  },
+];
+
+function IntegrationTile({ item }: { item: IntegrationItem }) {
+  return (
+    <article className="group relative overflow-hidden rounded-none border border-transparent bg-[rgba(10,12,15,0.92)]">
+      <div className="absolute inset-0 translate-x-[-102%] bg-[linear-gradient(90deg,#1f65d9_0%,#2e7cf6_58%,#4b96ff_100%)] transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:translate-x-0" />
+      <div className="relative flex min-h-[18rem] flex-col items-center justify-center gap-8 p-8 text-[var(--axis-text-primary)] transition-colors duration-300 group-hover:text-white">
+        <div className={`relative flex min-h-14 items-center justify-center ${item.logoWidthClass}`}>
+          <Image
+            src={item.logoSrc}
+            alt={`${item.name} logo`}
+            width={220}
+            height={96}
+            className="h-auto w-full object-contain transition-[transform,filter,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.04]"
+          />
+        </div>
+        <div className="text-center text-[1.1rem] text-[var(--axis-text-muted)] transition-colors duration-300 group-hover:text-white">
+          {item.name}
+        </div>
+      </div>
+    </article>
+  );
+}
+
 export default function Integrations() {
   return (
-    <section id="integrations" className="mx-auto max-w-7xl px-6 py-20 border-t border-[#1e2227]">
-      <ScrollReveal>
-        <div className="flex flex-col items-center text-center gap-2 max-w-md mx-auto mb-14">
-          <span className="text-xs uppercase font-semibold text-[#2e7cf6] tracking-wider">Integrations</span>
-          <h2 className="text-2xl font-bold text-white tracking-tight">Powered by</h2>
+    <section
+      id="integrations"
+      className="border-t border-[rgba(255,255,255,0.06)] bg-[var(--axis-background)]"
+    >
+      <div className="mx-auto max-w-[90rem] px-5 py-20 sm:px-6 lg:px-10 lg:py-24">
+        <ScrollReveal className="mx-auto max-w-[24rem] text-center" variant="scale">
+          <span className="font-mono text-[0.72rem] uppercase tracking-[0.18em] text-[var(--axis-text-muted)]">
+            Integrations
+          </span>
+        </ScrollReveal>
+
+        <div className="mt-12 grid overflow-hidden border border-[rgba(255,255,255,0.06)] md:grid-cols-2 xl:grid-cols-3">
+          {INTEGRATIONS.map((item, index) => (
+            <ScrollReveal
+              key={item.id}
+              delay={index * 70}
+              duration={720}
+              variant={
+                index % 3 === 0 ? "left" : index % 3 === 2 ? "right" : "rise"
+              }
+            >
+              <IntegrationTile item={item} />
+            </ScrollReveal>
+          ))}
         </div>
-      </ScrollReveal>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        {/* Sui Network */}
-        <ScrollReveal delay={0}>
-          <div className="group rounded-md border border-[#1e2227] bg-[#121417] p-5 flex flex-col gap-2.5 items-center text-center hover:border-[#2e7cf6]/50 transition-all duration-300">
-            <svg className="w-8 h-8 text-[#38b6ff] transition-transform duration-300 group-hover:scale-105" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 14.5c0 .83-.67 1.5-1.5 1.5s-1.5-.67-1.5-1.5.67-1.5 1.5-1.5 1.5.67 1.5 1.5zm0-4c0 .83-.67 1.5-1.5 1.5s-1.5-.67-1.5-1.5.67-1.5 1.5-1.5 1.5.67 1.5 1.5z" />
-            </svg>
-            <h4 className="text-sm font-semibold text-white">Sui Blockchain</h4>
-            <p className="text-xs text-[#9ca3af] leading-relaxed">
-              Enables instant multi-range execution via Programmable Transaction Blocks.
-            </p>
-          </div>
-        </ScrollReveal>
-
-        {/* DeepBook */}
-        <ScrollReveal delay={100}>
-          <div className="group rounded-md border border-[#1e2227] bg-[#121417] p-5 flex flex-col gap-2.5 items-center text-center hover:border-[#10b981]/50 transition-all duration-300">
-            <svg className="w-8 h-8 text-[#10b981] transition-transform duration-300 group-hover:scale-105" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12z" />
-            </svg>
-            <h4 className="text-sm font-semibold text-white">DeepBook Predict</h4>
-            <p className="text-xs text-[#9ca3af] leading-relaxed">
-              Underlying prediction protocol for cycle settlements and volatility publishing.
-            </p>
-          </div>
-        </ScrollReveal>
-
-        {/* OpenRouter */}
-        <ScrollReveal delay={200}>
-          <div className="group rounded-md border border-[#1e2227] bg-[#121417] p-5 flex flex-col gap-2.5 items-center text-center hover:border-[#06b6d4]/50 transition-all duration-300">
-            <svg className="w-8 h-8 text-[#06b6d4] transition-transform duration-300 group-hover:scale-105" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 2 12 22Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M8 14L12 10L16 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <h4 className="text-sm font-semibold text-white">OpenRouter API</h4>
-            <p className="text-xs text-[#9ca3af] leading-relaxed">
-              Facilitates off-chain quantitative AI analysis and volatility mapping.
-            </p>
-          </div>
-        </ScrollReveal>
       </div>
     </section>
   );

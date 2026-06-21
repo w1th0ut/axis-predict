@@ -18,8 +18,15 @@ export default function SecurityConsole({
   simulationError,
   tvl,
 }: SecurityConsoleProps) {
+  const formattedTvl = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(tvl);
+
   return (
-    <section id="simulator" className="border-t border-[#1e2227] bg-[#121417]/10 py-20 relative overflow-hidden">
+    <section id="security" className="border-t border-[#1e2227] bg-[#121417]/10 py-20 relative overflow-hidden">
       <div className="mx-auto max-w-7xl px-6 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
         <div className="lg:col-span-6 flex flex-col items-start gap-4">
           <ScrollReveal>
@@ -62,7 +69,7 @@ export default function SecurityConsole({
               <div className="p-5 font-mono text-[10px] md:text-xs flex flex-col gap-2.5 min-h-[190px] bg-[#08090a] leading-relaxed">
                 <div className="text-[#9ca3af]">
                   &gt; SUI MOVE VM ACTIVE (max_allocation_bps = 2000)<br />
-                  &gt; TVL VAULT AUDITED: $12,482,904.50 dUSDC
+                  &gt; TVL VAULT AUDITED: {formattedTvl} dUSDC
                 </div>
 
                 {simulationActive && (

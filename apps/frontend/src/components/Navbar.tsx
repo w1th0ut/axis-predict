@@ -1,43 +1,128 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
+import BrandMark from "./BrandMark";
 
 export default function Navbar() {
-  return (
-    <header className="sticky top-0 z-50 border-b border-[#1e2227] bg-[#08090a]/85 backdrop-blur-md">
-      <div className="mx-auto max-w-7xl px-6 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-2.5 group cursor-pointer">
-          <div className="text-[#2e7cf6] transition-transform duration-300 group-hover:rotate-12">
-            <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M4 20h16M4 4v16M8 16l4-6 4 4 4-8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <circle cx="8" cy="16" r="1.5" fill="#08090a" stroke="currentColor" strokeWidth="2" />
-              <circle cx="12" cy="10" r="1.5" fill="#08090a" stroke="currentColor" strokeWidth="2" />
-              <circle cx="16" cy="14" r="1.5" fill="#08090a" stroke="currentColor" strokeWidth="2" />
-            </svg>
-          </div>
-          <span className="font-semibold text-base tracking-tight bg-gradient-to-r from-white to-[#a3a3a3] bg-clip-text text-transparent">
-            Axis Predict
-          </span>
-        </div>
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
 
-        <nav className="hidden md:flex items-center gap-8 text-xs font-semibold text-[#9ca3af]">
-          <a href="#features" className="relative py-1 hover:text-white transition-colors duration-200 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1px] after:bg-[#2e7cf6] after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-300 after:origin-left">
-            Strategy
-          </a>
-          <a href="#simulator" className="relative py-1 hover:text-white transition-colors duration-200 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1px] after:bg-[#2e7cf6] after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-300 after:origin-left">
-            Guardrails
-          </a>
-          <a href="#integrations" className="relative py-1 hover:text-white transition-colors duration-200 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[1px] after:bg-[#2e7cf6] after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-300 after:origin-left">
-            Integrations
-          </a>
+  const navItems = [
+    { href: "#strategy", label: "Strategy" },
+    { href: "#integrations", label: "Integrations" },
+  ];
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 28);
+    };
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
+
+  return (
+    <header className="sticky top-0 z-50 px-4 pt-4 sm:px-6 lg:px-8">
+      <div
+        className={`axis-nav-enter mx-auto flex items-center justify-between gap-4 transition-all duration-300 ease-out ${
+          isScrolled ? "max-w-[73rem]" : "max-w-[90rem]"
+        }`}
+      >
+        <div
+          className={`flex w-full items-center justify-between gap-4 rounded-[1.35rem] border px-5 py-4 transition-[max-width,background-color,backdrop-filter,box-shadow,padding] duration-300 ease-out sm:px-6 lg:px-8 ${
+            isScrolled
+              ? "border border-[rgba(30,34,39,0.92)] bg-[rgba(12,14,17,0.92)] shadow-[0_14px_40px_rgba(0,0,0,0.28)] backdrop-blur-xl"
+              : "border-transparent bg-[rgba(12,14,17,0.22)] shadow-none backdrop-blur-md"
+          }`}
+        >
+        <a href="#" className="shrink-0">
+          <BrandMark compact />
+        </a>
+
+        <nav className="hidden items-center gap-7 lg:flex">
+          {navItems.map((item) => (
+            <a
+              key={item.label}
+              href={item.href}
+              className="text-sm text-[var(--axis-text-secondary)] transition-colors duration-150 hover:text-[var(--axis-text-primary)]"
+            >
+              {item.label}
+            </a>
+          ))}
         </nav>
 
-        <div>
-          <button className="relative h-9 items-center justify-center rounded-sm bg-[#2e7cf6] hover:bg-[#1b62d1] px-5 text-xs font-semibold text-white transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_20px_rgba(46,124,246,0.3)] active:scale-[0.98] inline-flex overflow-hidden">
+        <div className="hidden items-center lg:flex">
+          <a
+            href="#launch"
+            className="inline-flex min-h-11 items-center justify-center rounded-full bg-[var(--axis-text-primary)] px-5 text-sm font-medium text-[var(--axis-background)] transition-[transform,background-color,box-shadow] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_14px_28px_rgba(255,255,255,0.12)]"
+          >
             Launch App
-          </button>
+          </a>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setIsMenuOpen((value) => !value)}
+          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-[6px] border border-[var(--axis-border)] bg-[rgba(18,20,23,0.72)] text-[var(--axis-text-primary)] lg:hidden"
+          aria-expanded={isMenuOpen}
+          aria-label="Toggle navigation"
+        >
+          <svg
+            className="h-5 w-5"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            {isMenuOpen ? (
+              <path
+                d="M6 6L18 18M18 6L6 18"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            ) : (
+              <path
+                d="M4 7H20M4 12H20M4 17H20"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            )}
+          </svg>
+        </button>
         </div>
       </div>
+
+      {isMenuOpen ? (
+        <div className="mx-auto mt-2 max-w-[90rem] lg:hidden">
+          <div className="grid gap-2 rounded-[1.35rem] border border-[rgba(255,255,255,0.08)] bg-[rgba(12,14,17,0.96)] px-5 py-4 backdrop-blur-xl sm:px-6">
+            {navItems.map((item) => (
+              <a
+                key={item.label}
+                href={item.href}
+                className="rounded-[6px] border border-transparent px-3 py-3 text-sm text-[var(--axis-text-secondary)] transition-colors duration-150 hover:border-[var(--axis-border)] hover:bg-[var(--axis-surface)] hover:text-[var(--axis-text-primary)]"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                {item.label}
+              </a>
+            ))}
+            <div className="mt-2 grid gap-2">
+              <a
+                href="#launch"
+                className="inline-flex min-h-11 items-center justify-center rounded-[999px] bg-[var(--axis-text-primary)] px-4 text-sm font-semibold text-[var(--axis-background)]"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Launch App
+              </a>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </header>
   );
 }

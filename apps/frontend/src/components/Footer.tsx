@@ -55,9 +55,13 @@ export default function Footer() {
       <div className="mx-auto max-w-[90rem] px-5 sm:px-6 lg:px-10">
         <div className="grid gap-12 pt-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,3fr)] lg:gap-16">
           <ScrollReveal className="max-w-[24rem]" variant="left">
-            <div className="text-[2rem] font-medium tracking-[-0.04em] text-[var(--axis-text-primary)]">
-              Axis <span className="text-[var(--axis-primary)]">Predict</span>
-            </div>
+            <Image
+              src="/full-logo.png"
+              alt="Axis Predict Logo"
+              width={160}
+              height={38}
+              className="h-9 w-auto object-contain"
+            />
             <p className="mt-6 text-[1.02rem] leading-8 text-[var(--axis-text-secondary)]">
               AI-powered premium harvesting for DeepBook Predict on Sui.
               Deposit dUSDC, receive liquid vault shares, and keep risk

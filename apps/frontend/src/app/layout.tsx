@@ -21,6 +21,9 @@ const instrumentSans = Instrument_Sans({
 export const metadata: Metadata = {
   title: "Axis Predict - DeFAI Range Harvester",
   description: "DeFAI Range Harvester for DeepBook Predict Ecosystem. Optimize rolling expiry yields on Sui with mathematically enforced risk limits.",
+  icons: {
+    icon: "/logo.png",
+  },
 };
 
 export default function RootLayout({

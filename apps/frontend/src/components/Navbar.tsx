@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import BrandMark from "./BrandMark";
+import Image from "next/image";
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -39,8 +39,15 @@ export default function Navbar() {
               : "border-transparent bg-[rgba(12,14,17,0.22)] shadow-none backdrop-blur-md"
           }`}
         >
-        <a href="#" className="shrink-0">
-          <BrandMark compact />
+        <a href="#" className="shrink-0 flex items-center">
+          <Image
+            src="/full-logo.png"
+            alt="Axis Predict Logo"
+            width={140}
+            height={33}
+            className="h-8 w-auto object-contain"
+            priority
+          />
         </a>
 
         <nav className="hidden items-center gap-7 lg:flex">

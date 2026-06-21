@@ -17,7 +17,7 @@ export default function HeroSection({
   waveOffset,
 }: HeroSectionProps) {
   return (
-    <section className="relative overflow-hidden border-b border-[var(--axis-border)]">
+    <section className="relative overflow-hidden">
       <HeroVisual waveOffset={waveOffset} />
       <div className="relative mx-auto min-h-[calc(100svh-5.75rem)] max-w-[90rem] px-5 pb-8 pt-10 sm:px-6 md:pb-10 md:pt-14 lg:px-10 lg:pb-12 lg:pt-16">
         <div className="flex min-h-[calc(100svh-8.5rem)] flex-col justify-center">
@@ -43,6 +43,14 @@ export default function HeroSection({
           </div>
         </div>
       </div>
+      {/* Smooth blurry transition separator */}
+      <div 
+        className="absolute bottom-0 left-0 right-0 h-28 pointer-events-none z-20 bg-gradient-to-t from-[var(--axis-background)] to-transparent backdrop-blur-[12px]"
+        style={{ 
+          maskImage: "linear-gradient(to top, black, transparent)",
+          WebkitMaskImage: "linear-gradient(to top, black, transparent)"
+        }}
+      />
     </section>
   );
 }

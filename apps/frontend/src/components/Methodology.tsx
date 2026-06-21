@@ -34,7 +34,7 @@ export default function Methodology() {
   return (
     <section
       id="strategy"
-      className="border-t border-[rgba(255,255,255,0.06)] bg-[var(--axis-background)]"
+      className="bg-[var(--axis-background)]"
     >
       <div className="mx-auto max-w-[90rem] px-5 py-20 sm:px-6 lg:px-10 lg:py-24">
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)] lg:items-start">
@@ -83,7 +83,8 @@ export default function Methodology() {
                     src="/graph.png"
                     alt="Axis Predict strategy graph"
                     fill
-                    priority={false}
+                    sizes="(max-width: 1024px) 100vw, 50vw"
+                    priority
                     className="object-cover object-center opacity-88"
                   />
                   <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,9,10,0.1)_0%,rgba(8,9,10,0)_28%,rgba(8,9,10,0.22)_68%,rgba(8,9,10,0.74)_100%)]" />
@@ -112,7 +113,7 @@ export default function Methodology() {
                   </p>
 
                   <div className="mt-12">
-                    <div className="font-display text-[2.8rem] leading-none tracking-[-0.05em] text-[var(--axis-text-primary)]">
+                    <div className="font-display text-[2.8rem] leading-none tracking-[-0.05em] text-[var(--axis-text-primary)] transition-colors duration-300 group-hover:text-[var(--axis-primary)]">
                       {card.metric}
                     </div>
                     <div className="mt-3 font-mono text-[0.72rem] uppercase tracking-[0.18em] text-[var(--axis-text-muted)]">

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 interface HeroStatsProps {
   totalHarvested: number;
@@ -14,15 +14,79 @@ const CURRENCY_FORMATTER = new Intl.NumberFormat("en-US", {
 });
 
 export default function HeroStats({ totalHarvested, tvl }: HeroStatsProps) {
+  const [displayTvl, setDisplayTvl] = useState<string>("");
+  const [displayHarvested, setDisplayHarvested] = useState<string>("");
+
+  // Initialize with formatted values to avoid hydration mismatch
+  useEffect(() => {
+    setDisplayTvl(CURRENCY_FORMATTER.format(tvl));
+    setDisplayHarvested(CURRENCY_FORMATTER.format(totalHarvested));
+  }, [tvl, totalHarvested]);
+
+  // Run the randomizer decrypt animation on mount
+  useEffect(() => {
+    const runRandomizer = (
+      targetVal: number,
+      setValue: (val: string) => void
+    ) => {
+      const targetStr = CURRENCY_FORMATTER.format(targetVal);
+      const chars = targetStr.split("");
+      const duration = 1200; // 1.2 seconds animation
+      const fps = 30; // 30 updates per second
+      const intervalMs = 1000 / fps;
+      const totalFrames = duration / intervalMs;
+      let frame = 0;
+
+      const timer = setInterval(() => {
+        frame++;
+        const progress = frame / totalFrames;
+
+        if (progress >= 1) {
+          setValue(targetStr);
+          clearInterval(timer);
+          return;
+        }
+
+        const animatedStr = chars
+          .map((char, index) => {
+            // Keep formatting characters unchanged
+            if (char === "$" || char === "," || char === "." || char === "-") {
+              return char;
+            }
+            // Lock characters from left to right as time progresses
+            const lockThreshold = progress * chars.length;
+            if (index < lockThreshold) {
+              return char;
+            }
+            // Generate random numeric digits (0-9)
+            return Math.floor(Math.random() * 10).toString();
+          })
+          .join("");
+
+        setValue(animatedStr);
+      }, intervalMs);
+
+      return () => clearInterval(timer);
+    };
+
+    const cleanupTvl = runRandomizer(tvl, setDisplayTvl);
+    const cleanupHarvested = runRandomizer(totalHarvested, setDisplayHarvested);
+
+    return () => {
+      cleanupTvl();
+      cleanupHarvested();
+    };
+  }, [tvl, totalHarvested]);
+
   const items = [
     {
       label: "Vault TVL",
-      value: CURRENCY_FORMATTER.format(tvl),
+      value: displayTvl || CURRENCY_FORMATTER.format(tvl),
       note: "Active liquidity",
     },
     {
       label: "Premium",
-      value: CURRENCY_FORMATTER.format(totalHarvested),
+      value: displayHarvested || CURRENCY_FORMATTER.format(totalHarvested),
       note: "Harvested yield",
     },
     {

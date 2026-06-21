@@ -25,13 +25,19 @@ export default function PreFooterCta() {
                   harvest rolling premium with hard on-chain guardrails.
                 </p>
 
-                <div className="mt-12 flex flex-col gap-4 sm:flex-row">
+                <div className="mt-10 flex flex-wrap gap-5">
                   <a
-                    href="#launch"
-                    className="inline-flex min-h-14 items-center justify-center bg-[var(--axis-text-primary)] px-7 text-[1.02rem] font-medium text-[var(--axis-background)] transition-[transform,background-color,box-shadow] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_16px_36px_rgba(255,255,255,0.12)]"
+                    href="/dashboard"
+                    className="group relative inline-flex min-h-14 items-center justify-center overflow-hidden bg-[var(--axis-text-primary)] px-7 text-[1.02rem] font-medium text-[var(--axis-background)] transition-colors duration-300 hover:text-white"
                   >
-                    Launch app
-                    <span className="ml-3 text-[1.2rem]">&rarr;</span>
+                    {/* Slide fill background */}
+                    <span className="absolute inset-0 origin-left scale-x-0 bg-[var(--axis-primary)] transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-x-100" />
+                    
+                    {/* Button content */}
+                    <span className="relative z-10 flex items-center">
+                      Launch app
+                      <span className="ml-3 text-[1.2rem] transition-transform duration-200 group-hover:translate-x-1">&rarr;</span>
+                    </span>
                   </a>
                 </div>
 
@@ -46,6 +52,7 @@ export default function PreFooterCta() {
                   src="/coin.png"
                   alt="Axis Predict coin visual"
                   fill
+                  sizes="(max-width: 1024px) 100vw, 40vw"
                   className="object-contain object-center p-8 opacity-95 lg:p-10"
                 />
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_66%_58%,rgba(46,124,246,0.16),transparent_24%),linear-gradient(180deg,rgba(8,9,10,0.04),rgba(8,9,10,0.66))]" />

@@ -64,8 +64,8 @@ export default function Navbar() {
 
         <div className="hidden items-center lg:flex">
           <a
-            href="#launch"
-            className="inline-flex min-h-11 items-center justify-center rounded-full bg-[var(--axis-text-primary)] px-5 text-sm font-medium text-[var(--axis-background)] transition-[transform,background-color,box-shadow] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_14px_28px_rgba(255,255,255,0.12)]"
+            href="/dashboard"
+            className="inline-flex min-h-11 items-center justify-center rounded-full bg-[var(--axis-text-primary)] px-5 text-sm font-medium text-[var(--axis-background)] transition-[background-color,color,box-shadow] duration-200 ease-out hover:bg-[var(--axis-primary)] hover:text-white hover:shadow-[0_0_20px_rgba(46,124,246,0.35)]"
           >
             Launch App
           </a>
@@ -120,8 +120,8 @@ export default function Navbar() {
             ))}
             <div className="mt-2 grid gap-2">
               <a
-                href="#launch"
-                className="inline-flex min-h-11 items-center justify-center rounded-[999px] bg-[var(--axis-text-primary)] px-4 text-sm font-semibold text-[var(--axis-background)]"
+                href="/dashboard"
+                className="inline-flex min-h-11 items-center justify-center rounded-[999px] bg-[var(--axis-text-primary)] px-4 text-sm font-semibold text-[var(--axis-background)] transition-[background-color,color] duration-200 hover:bg-[var(--axis-primary)] hover:text-white"
                 onClick={() => setIsMenuOpen(false)}
               >
                 Launch App

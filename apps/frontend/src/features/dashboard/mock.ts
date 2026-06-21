@@ -7,12 +7,8 @@ export const dashboardMock: DashboardData = {
     { id: "activity", label: "Activity" },
   ],
   topbar: {
-    title: "Vault Overview",
+    title: "Portfolio Overview",
     description: "Track vault posture, performance, and current deployment state.",
-    wallet: {
-      label: "Connect Wallet",
-      connected: false,
-    },
   },
   portfolio: {
     totalValueUsd: "$4,820.44",

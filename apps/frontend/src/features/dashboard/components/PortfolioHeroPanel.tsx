@@ -14,7 +14,7 @@ export default function PortfolioHeroPanel({
       <div className="flex h-full flex-col justify-between gap-8">
         <div>
           <div className="font-mono text-[0.72rem] uppercase tracking-[0.18em] text-[var(--axis-text-muted)]">
-            Total Vault Value
+            Total Portfolio Value
           </div>
           <div className="font-display mt-4 text-[3.3rem] leading-[0.92] tracking-[-0.06em] text-[var(--axis-text-primary)] sm:text-[4.4rem]">
             {data.totalValueUsd}
@@ -26,15 +26,18 @@ export default function PortfolioHeroPanel({
         </p>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard label="Deposited dUSDC" value={data.depositedDusdc} />
-          <MetricCard label="pUSDC Balance" value={data.pusdcBalance} />
           <MetricCard
-            label="Net PnL"
+            label="Your Deposited dUSDC"
+            value={data.depositedDusdc}
+          />
+          <MetricCard label="Your pUSDC Shares" value={data.pusdcBalance} />
+          <MetricCard
+            label="Your Net PnL"
             value={data.netPnl.value}
             accent={data.netPnl.positive}
           />
           <MetricCard
-            label="Share Growth"
+            label="Vault Share Growth"
             value={data.shareGrowth.value}
             accent={data.shareGrowth.positive}
           />

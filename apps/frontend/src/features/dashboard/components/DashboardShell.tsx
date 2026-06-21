@@ -23,13 +23,13 @@ export default function DashboardShell() {
   const data = dashboardMock;
   const topbarTitle =
     activeView === "overview"
-      ? "Vault Overview"
+      ? "Portfolio Overview"
       : activeView === "vault"
         ? "Vault Controls"
         : "Vault Activity";
   const topbarDescription =
     activeView === "overview"
-      ? "A short summary of your position before moving into controls or live activity."
+      ? "A personal snapshot of your position before moving into vault controls or live activity."
       : activeView === "vault"
         ? "Manage deposits and withdrawals while monitoring active guardrails."
         : "Follow live reasoning, executions, and settlement flow as the agent acts.";
@@ -40,8 +40,8 @@ export default function DashboardShell() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[var(--axis-background)] text-[var(--axis-text-primary)]">
-      <div className="pointer-events-none absolute inset-0">
+    <div className="relative min-h-screen bg-[var(--axis-background)] text-[var(--axis-text-primary)]">
+      <div className="pointer-events-none fixed inset-0">
         <LiquidChrome
           className="h-full w-full opacity-80"
           baseColor={[0.2, 0.34, 0.62]}

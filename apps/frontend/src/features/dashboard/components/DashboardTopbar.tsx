@@ -2,6 +2,7 @@
 
 import React from "react";
 import { TopbarData } from "../types";
+import WalletConnectControl from "./WalletConnectControl";
 
 interface DashboardTopbarProps {
   data: TopbarData;
@@ -47,16 +48,7 @@ export default function DashboardTopbar({
         </div>
       </div>
 
-      <button
-        type="button"
-        className={`inline-flex min-h-11 items-center justify-center rounded-full px-5 text-sm font-medium transition-[transform,background-color,box-shadow,border-color] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-          data.wallet.connected
-            ? "border border-[rgba(46,124,246,0.26)] bg-[rgba(46,124,246,0.12)] text-[var(--axis-text-primary)]"
-            : "bg-[var(--axis-text-primary)] text-[var(--axis-background)] hover:-translate-y-0.5 hover:bg-[var(--axis-primary)] hover:text-white hover:shadow-[0_16px_28px_rgba(46,124,246,0.22)]"
-        }`}
-      >
-        {data.wallet.label}
-      </button>
+      <WalletConnectControl />
     </header>
   );
 }

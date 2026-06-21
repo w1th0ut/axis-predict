@@ -21,10 +21,6 @@ export interface DashboardNavItem {
 export interface TopbarData {
   title: string;
   description: string;
-  wallet: {
-    label: string;
-    connected: boolean;
-  };
 }
 
 export interface PortfolioHeroData {
